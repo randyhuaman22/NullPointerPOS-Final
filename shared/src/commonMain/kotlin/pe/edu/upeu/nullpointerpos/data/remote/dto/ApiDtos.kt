@@ -1,0 +1,356 @@
+// Autor: Randy Huaman (Contratos DTO sincronizados con Spring Cloud Gateway :8080)
+
+package pe.edu.upeu.nullpointerpos.data.remote.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
+import pe.edu.upeu.nullpointerpos.domain.model.Usuario
+
+@Serializable
+data class LoginRequest(val codigoTrabajador: String, val clave: String)
+
+@Serializable
+data class LoginResponse(val token: String, val tipoToken: String, val expiraEnSegundos: Long, val usuario: Usuario)
+
+@Serializable
+data class ProductoDto(
+    val idProducto: Long,
+    val nombre: String,
+    val descripcion: String? = null,
+    val precioUnitario: JsonPrimitive,
+    val categoria: String,
+    val disponible: Boolean,
+    val estacionCocina: String? = null
+)
+
+@Serializable
+data class DetalleRequest(val idProducto: Long, val cantidad: Int, val observaciones: String)
+
+@Serializable
+data class CrearPedidoRequest(val idMesa: Long, val observaciones: String, val detalles: List<DetalleRequest>)
+
+@Serializable
+data class EditarPedidoRequest(val detalles: List<DetalleRequest>)
+
+@Serializable
+data class TrasladoRequest(val idPedido: Long, val idMesaDestino: Long, val motivo: String)
+
+@Serializable
+data class DetalleDto(
+    @SerialName("idDetallePedido") val idDetallePedido: Long? = null,
+    @SerialName("idDetalle") val idDetalleAlt: Long? = null,
+    val idProducto: Long = 0L,
+    val nombreProducto: String = "",
+    val cantidad: Int = 1,
+    val precioUnitario: JsonPrimitive? = null,
+    val observaciones: String? = null,
+    val estado: String = "PENDIENTE"
+) {
+    val idDetalle: Long? get() = idDetallePedido ?: idDetalleAlt
+}
+
+@Serializable
+data class PedidoDto(
+    val idPedido: Long,
+    val codigoPedido: String,
+    val idMesa: Long,
+    val codigoMesa: String,
+    val codigoMozo: String? = null,
+    val estado: String,
+    val importeTotal: JsonPrimitive,
+    val fechaEnvio: String? = null,
+    val detalles: List<DetalleDto> = emptyList(),
+    val observaciones: String? = null,
+    val descuentoTotal: JsonPrimitive? = null,
+    val porcentajeDescuento: Double? = null
+)
+
+@Serializable
+data class EnvioResponse(val mensaje: String, val pedido: PedidoDto)
+
+@Serializable
+data class CrearUsuarioRequest(
+    val codigoTrabajador: String,
+    val nombreCompleto: String,
+    val correo: String?,
+    val clave: String,
+    val rol: String
+)
+
+// DTOs de Cocina (Sprint 2)
+@Serializable
+data class DisponibilidadProductoRequest(val idProducto: Long, val disponible: Boolean)
+
+// DTOs de Caja (Sprint 2 y 3)
+@Serializable
+data class AperturaCajaRequest(val montoInicial: Double)
+
+@Serializable
+data class TurnoCajaResponse(
+    val idTurno: Long,
+    val cajero: String,
+    val montoInicial: JsonPrimitive,
+    val fechaApertura: String,
+    val estado: String
+)
+
+@Serializable
+data class ResumenPagoDto(
+    val idPedido: Long,
+    val codigoPedido: String,
+    val estado: String,
+    val importeTotal: JsonPrimitive,
+    val totalDescuento: JsonPrimitive? = null
+)
+
+@Serializable
+data class CobroEfectivoRequest(
+    val idPedido: Long,
+    val idTurnoCaja: Long,
+    val importeRecibido: Double,
+    val importeTotal: Double,
+    val llaveIdempotencia: String
+)
+
+@Serializable
+data class CobroDigitalRequest(
+    val idPedido: Long,
+    val idTurnoCaja: Long,
+    val metodoPago: String,
+    val importeTotal: Double,
+    val numeroOperacion: String,
+    val ultimosCuatroDigitos: String,
+    val llaveIdempotencia: String
+)
+
+@Serializable
+data class PartePagoDto(
+    val metodoPago: String,
+    val importe: Double,
+    val numeroOperacion: String? = null,
+    val ultimosCuatroDigitos: String? = null
+)
+
+@Serializable
+data class CobroMixtoRequest(
+    val idPedido: Long,
+    val idTurnoCaja: Long,
+    val partes: List<PartePagoDto>,
+    val llaveIdempotencia: String
+)
+
+@Serializable
+data class CierreCajaRequest(
+    val idTurno: Long,
+    val montoEfectivoReal: Double,
+    val motivoCierre: String = "CIERRE NORMAL"
+)
+
+@Serializable
+data class CierreCajaResponse(
+    val idTurno: Long,
+    val estado: String,
+    val montoInicial: JsonPrimitive,
+    val totalEfectivoEsperado: JsonPrimitive,
+    val totalEfectivoReal: JsonPrimitive,
+    val diferencia: JsonPrimitive,
+    val fechaCierre: String
+)
+
+@Serializable
+data class ClienteDto(
+    val tipoDocumento: String,
+    val numeroDocumento: String,
+    val razonSocial: String,
+    val direccion: String? = null,
+    val correo: String? = null,
+    val telefono: String? = null
+)
+
+@Serializable
+data class TicketWhatsAppRequest(
+    val idPedido: Long,
+    val numeroTelefono: String,
+    val idTurnoCaja: Long
+)
+
+@Serializable
+data class DescuentoPedidoRequest(
+    val porcentaje: Double,
+    val motivo: String
+)
+
+@Serializable
+data class AnularPedidoRequest(
+    val motivo: String
+)
+
+// DTOs de Inventario (Sprint 3)
+@Serializable
+data class InsumoDto(
+    @SerialName("id_insumo") val id_insumo: Long? = null,
+    @SerialName("idInsumo") val idInsumoAlt: Long? = null,
+    val codigo: String? = "",
+    val nombre: String = "",
+    val unidad: String? = "und",
+    @SerialName("stock_actual") val stock_actual: Double? = null,
+    @SerialName("stockActual") val stockActualAlt: Double? = null,
+    @SerialName("stock_minimo") val stock_minimo: Double? = null,
+    @SerialName("stockMinimo") val stockMinimoAlt: Double? = null,
+    @SerialName("costo_unitario") val costo_unitario: JsonPrimitive? = null,
+    @SerialName("costoUnitario") val costoUnitarioAlt: JsonPrimitive? = null
+) {
+    val idInsumo: Long get() = id_insumo ?: idInsumoAlt ?: 0L
+    val codigoInsumo: String get() = codigo.orEmpty()
+    val unidadMedida: String get() = unidad ?: "und"
+    val stockActual: Double get() = stock_actual ?: stockActualAlt ?: 0.0
+    val stockMinimo: Double get() = stock_minimo ?: stockMinimoAlt ?: 0.0
+    val costoUnitario: JsonPrimitive get() = costo_unitario ?: costoUnitarioAlt ?: JsonPrimitive(0.0)
+}
+
+@Serializable
+data class CrearInsumoRequest(
+    val codigo: String,
+    val nombre: String,
+    val unidad: String,
+    val stockInicial: Double,
+    val stockMinimo: Double,
+    val costoUnitario: Double
+)
+
+@Serializable
+data class IngredienteRecetaDto(
+    val idInsumo: Long,
+    val cantidadRequerida: Double,
+    val unidadMedida: String
+)
+
+@Serializable
+data class RecetaRequest(
+    val idProducto: Long,
+    val ingredientes: List<IngredienteRecetaDto>
+)
+
+@Serializable
+data class ItemCompraDto(
+    val idInsumo: Long,
+    val cantidad: Double,
+    val costoUnitario: Double
+)
+
+@Serializable
+data class CompraRequest(
+    val proveedor: String,
+    val numeroDocumento: String,
+    val items: List<ItemCompraDto>,
+    val observaciones: String = ""
+)
+
+@Serializable
+data class MermaRequest(
+    val idInsumo: Long,
+    val cantidad: Double,
+    val motivo: String,
+    val observaciones: String = ""
+)
+
+// DTOs de Reportes y Auditoria (Sprint 3 - Tolerantes a snake_case)
+@Serializable
+data class SolicitudSimularTarjeta(
+    val numeroTarjeta: String,
+    val mesExpiracion: String,
+    val anioExpiracion: String,
+    val cvv: String,
+    val titular: String,
+    val monto: Double
+)
+
+@Serializable
+data class RespuestaSimuladorTarjeta(
+    val aprobado: Boolean,
+    val codigoAutorizacion: String,
+    val mensaje: String,
+    val ultimosCuatroDigitos: String,
+    val marcaTarjeta: String,
+    val referencia: String
+)
+
+@Serializable
+data class SolicitudEmitirComprobante(
+    val idPedido: Long,
+    val idTurnoCaja: Long,
+    val tipoComprobante: String,
+    val serie: String? = null,
+    val tipoDocumentoCliente: String,
+    val numeroDocumentoCliente: String,
+    val razonSocialCliente: String,
+    val correoEnvio: String? = null
+)
+
+@Serializable
+data class RespuestaComprobanteSunat(
+    val idComprobante: Long,
+    val tipoComprobante: String,
+    val serie: String,
+    val numero: Long,
+    val numeroComprobante: String,
+    val estadoSunat: String,
+    val descripcionSunat: String,
+    val codigoHash: String,
+    val codigoQr: String,
+    val totalGravado: Double,
+    val totalIgv: Double,
+    val totalImporte: Double,
+    val fechaEmision: String,
+    val urlPdf: String? = null,
+    val urlXml: String? = null
+)
+
+@Serializable
+data class VentaPorHoraDto(
+    val hora: Int = 0,
+    @SerialName("pedidos") val pedidos: Int? = null,
+    @SerialName("cantidadPedidos") val cantidadPedidosAlt: Int? = null,
+    @SerialName("total") val total: JsonPrimitive? = null,
+    @SerialName("totalVendido") val totalVendidoAlt: JsonPrimitive? = null
+) {
+    val cantidadPedidos: Int get() = pedidos ?: cantidadPedidosAlt ?: 0
+    val totalVendido: JsonPrimitive get() = total ?: totalVendidoAlt ?: JsonPrimitive(0.0)
+}
+
+@Serializable
+data class PlatoPopularDto(
+    @SerialName("id_producto") val id_producto: Long? = null,
+    @SerialName("idProducto") val idProductoAlt: Long? = null,
+    @SerialName("nombre_producto") val nombre_producto: String? = null,
+    @SerialName("nombreProducto") val nombreProductoAlt: String? = null,
+    val unidades: Int? = null,
+    @SerialName("unidadesVendidas") val unidadesVendidasAlt: Int? = null,
+    val venta: JsonPrimitive? = null,
+    @SerialName("totalVendido") val totalVendidoAlt: JsonPrimitive? = null
+) {
+    val idProducto: Long get() = id_producto ?: idProductoAlt ?: 0L
+    val nombreProducto: String get() = nombre_producto ?: nombreProductoAlt ?: "Plato"
+    val unidadesVendidas: Int get() = unidades ?: unidadesVendidasAlt ?: 0
+    val totalVendido: JsonPrimitive get() = venta ?: totalVendidoAlt ?: JsonPrimitive(0.0)
+}
+
+@Serializable
+data class AuditoriaPedidoDto(
+    @SerialName("id_registro_auditoria") val id_registro_auditoria: Long? = null,
+    @SerialName("idAuditoria") val idAuditoriaAlt: Long? = null,
+    @SerialName("id_entidad") val id_entidad: Long? = null,
+    @SerialName("idPedido") val idPedidoAlt: Long? = null,
+    val accion: String = "",
+    @SerialName("id_usuario_actor") val id_usuario_actor: JsonPrimitive? = null,
+    val usuario: String? = null,
+    val motivo: String = "",
+    @SerialName("fecha_creacion") val fecha_creacion: String? = null,
+    @SerialName("fechaHora") val fechaHoraAlt: String? = null
+) {
+    val idAuditoria: Long get() = id_registro_auditoria ?: idAuditoriaAlt ?: 0L
+    val idPedido: Long get() = id_entidad ?: idPedidoAlt ?: 0L
+    val usuarioActor: String get() = usuario ?: id_usuario_actor?.content ?: "Sistema"
+    val fechaHora: String get() = fecha_creacion ?: fechaHoraAlt ?: ""
+}
