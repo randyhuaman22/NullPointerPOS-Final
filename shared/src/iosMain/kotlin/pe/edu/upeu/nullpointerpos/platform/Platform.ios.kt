@@ -32,3 +32,6 @@ actual fun WendysLogo(modifier: Modifier) {
         Icon(Icons.Default.LocalFireDepartment, null, tint = AmbarDorado)
     }
 }
+
+@Composable
+actual fun ActualizarBarrasSistema(oscuro: Boolean) {}

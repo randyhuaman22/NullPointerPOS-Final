@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToLong
 import kotlin.time.Clock
 import org.koin.compose.viewmodel.koinViewModel
 import pe.edu.upeu.nullpointerpos.domain.model.*
@@ -57,10 +58,7 @@ import pe.edu.upeu.nullpointerpos.platform.WendysLogo
 import pe.edu.upeu.nullpointerpos.presentation.*
 import pe.edu.upeu.nullpointerpos.theme.*
 
-fun dineroD(monto: Double): String {
-    val centimos = (monto * 100).toLong()
-    return "S/ ${centimos / 100}.${(abs(centimos % 100)).toString().padStart(2, '0')}"
-}
+fun dineroD(monto: Double): String = dinero((monto * 100).roundToLong())
 
 fun formatearHoraLima(fechaIso: String): String {
     if (fechaIso.isBlank()) return ""
@@ -109,6 +107,7 @@ fun App() {
     }
 
     WendysTheme(darkTheme = s.modoOscuro) {
+        pe.edu.upeu.nullpointerpos.platform.ActualizarBarrasSistema(s.modoOscuro)
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             AnimatedContent(
                 targetState = mostrarSplash,
@@ -332,9 +331,10 @@ private fun Chips(opciones: List<String>, actual: String, cambiar: (String) -> U
     ) {
         items(opciones) { opcion ->
             val seleccionado = opcion == actual
+            val colorChip by animateColorAsState(if (seleccionado) Borgona else c.superficie, animationSpec = tween(180), label = "Filtro")
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = if (seleccionado) Borgona else c.superficie,
+                color = colorChip,
                 border = BorderStroke(1.dp, if (seleccionado) Borgona else c.borde),
                 shadowElevation = if (seleccionado) 3.dp else 1.dp,
                 modifier = Modifier.clickable { cambiar(opcion) }
@@ -1302,7 +1302,7 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                         color = c.superficie,
                         border = BorderStroke(1.dp, if (tieneBorradorLocal) AmbarProfundo.copy(alpha = 0.5f) else c.borde),
                         shadowElevation = 3.dp,
-                        modifier = Modifier.fillMaxWidth().clickable(enabled = !s.busy) { vm.abrir(mesa) }
+                        modifier = Modifier.animateItem().fillMaxWidth().animateContentSize().clickable(enabled = !s.busy) { vm.abrir(mesa) }
                     ) {
                         Column {
                             // Franja superior de acento de estado
@@ -2506,6 +2506,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     var metodoPago by rememberSaveable { mutableStateOf("Efectivo") }
     var efectivoRecibido by rememberSaveable { mutableStateOf("") }
     var numOperacion by rememberSaveable { mutableStateOf("") }
+    var mixtoMetodo by rememberSaveable { mutableStateOf("Yape") }
     var mixtoEfectivo by rememberSaveable { mutableStateOf("") }
     var mixtoDigital by rememberSaveable { mutableStateOf("") }
     var mixtoNumOp by rememberSaveable { mutableStateOf("") }
@@ -2549,6 +2550,15 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.height(4.dp))
         Heading("Caja & Facturación Electrónica", "Apertura de turno, boletas, facturas y cobros multicanal")
+        s.pendientesEmision.forEach { solicitud ->
+            Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Comprobante pendiente · Pedido #${solicitud.idPedido}", fontWeight = FontWeight.Bold)
+                    Text("Pago #${solicitud.idPago} confirmado.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { vm.recuperarComprobante(solicitud) }, enabled = !s.busy) { Text("Recuperar comprobante") }
+                }
+            }
+        }
 
         // 1. Estado del Turno de Caja (Apertura o Resumen)
         val turno = s.turnoCaja
@@ -2891,7 +2901,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         // 4. Métodos de Pago
                         Text("Método de Pago:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = c.textoPrincipal)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("Efectivo", "Yape / Plin", "Tarjeta", "Mixto").forEach { m ->
+                            listOf("Efectivo", "Yape", "Plin", "Tarjeta", "Mixto").forEach { m ->
                                 FilterChip(
                                     selected = metodoPago == m,
                                     onClick = { metodoPago = m },
@@ -2928,7 +2938,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     Text(dineroD(vueltoD), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge, color = VerdeEsmeralda)
                                 }
                             }
-                        } else if (metodoPago == "Yape / Plin") {
+                        } else if (metodoPago in listOf("Yape", "Plin")) {
                             Surface(shape = RoundedCornerShape(12.dp), color = c.contenedor, modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Icon(Icons.Default.QrCode2, null, Modifier.size(64.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
@@ -2939,7 +2949,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 OutlinedTextField(
                                     value = numOperacion,
                                     onValueChange = { numOperacion = it.filter(Char::isDigit).take(12) },
-                                    label = { Text("N° de Operación Yape / Plin *") },
+                                    label = { Text("N° de operación $metodoPago") },
                                     placeholder = { Text("ej. 684921") },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -3077,6 +3087,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 }
                             }
                         } else if (metodoPago == "Mixto") {
+                            Chips(listOf("Yape", "Plin"), mixtoMetodo) { mixtoMetodo = it }
                             Surface(shape = RoundedCornerShape(12.dp), color = c.contenedor, modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -3117,7 +3128,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     OutlinedTextField(
                                         value = mixtoDigital,
                                         onValueChange = { mixtoDigital = it },
-                                        label = { Text("Parte 2: Yape / Plin (S/.)") },
+                                        label = { Text("Parte 2: $mixtoMetodo (S/.)") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.fillMaxWidth()
@@ -3192,7 +3203,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         }
                         val pagoOk = when (metodoPago) {
                             "Efectivo" -> (efectivoRecibido.toDoubleOrNull() ?: 0.0) >= totalDouble
-                            "Yape / Plin" -> numOperacion.isNotBlank()
+                            "Yape", "Plin" -> numOperacion.isNotBlank()
                             "Tarjeta" -> s.transaccionTarjeta?.aprobadaFinal == true
                             "Mixto" -> {
                                 val ef = mixtoEfectivo.toDoubleOrNull() ?: 0.0
@@ -3209,14 +3220,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 val idMesa = pedidoActual.idMesa
                                 val metParam = when (metodoPago) {
                                     "Efectivo" -> "EFECTIVO"
-                                    "Yape / Plin" -> "YAPE"
+                                    "Yape", "Plin" -> metodoPago.uppercase()
                                     "Tarjeta" -> "TARJETA"
                                     else -> "MIXTO"
                                 }
                                 val efecParam = efectivoRecibido.toDoubleOrNull() ?: totalDouble
                                 val opParam = when (metodoPago) {
                                     "Tarjeta" -> s.transaccionTarjeta?.numeroOperacionFinal.orEmpty()
-                                    "Yape / Plin" -> numOperacion.trim()
+                                    "Yape", "Plin" -> numOperacion.trim()
                                     else -> ""
                                 }
                                 val ult4Param = if (metodoPago == "Tarjeta") s.transaccionTarjeta?.ultimos4Final.orEmpty() else ""
@@ -3225,7 +3236,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     val digD = mixtoDigital.toDoubleOrNull() ?: 0.0
                                     listOfNotNull(
                                         if (efecD > 0) Triple("EFECTIVO", efecD, null) else null,
-                                        if (digD > 0) Triple("YAPE", digD, mixtoNumOp.trim()) else null
+                                        if (digD > 0) Triple(mixtoMetodo.uppercase(), digD, mixtoNumOp.trim()) else null
                                     )
                                 } else emptyList()
 
@@ -3259,7 +3270,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             Icon(Icons.Default.Receipt, null)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (esFactura) "Cobrar y Emitir Factura SUNAT Beta" else "Cobrar y Emitir Boleta SUNAT Beta",
+                                if (esFactura) "Cobrar y generar factura" else "Cobrar y generar boleta",
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -3382,6 +3393,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
 
     // Modal de Comprobante Electrónico SUNAT Beta emitido
     s.comprobanteEmitido?.let { comp ->
+        val aceptado = comp.estadoFinal == "ACEPTADO"
+        val rechazado = comp.estadoFinal == "RECHAZADO"
+        val colorEstado = if (aceptado) VerdeEsmeralda else if (rechazado) RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo
         var telReenvio by rememberSaveable(comp.idComprobante) { mutableStateOf(telefonoWhatsApp) }
         var selloVisible by remember(comp.idComprobante) { mutableStateOf(false) }
         LaunchedEffect(comp.idComprobante) { selloVisible = true }
@@ -3401,17 +3415,17 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                 ) {
                     Column {
                         Text("Comprobante Electrónico", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text(comp.numeroFinal, fontSize = 12.sp, color = VerdeEsmeralda, fontWeight = FontWeight.Bold)
+                        Text(comp.numeroFinal, fontSize = 12.sp, color = c.textoSecundario, fontWeight = FontWeight.Bold)
                     }
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = c.verdeBg,
+                        color = if (aceptado) c.verdeBg else if (rechazado) c.rojoBg else c.ambarBg,
                         modifier = Modifier.graphicsLayer { scaleX = escalaSello; scaleY = escalaSello }
                     ) {
                         Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Verified, null, tint = VerdeEsmeralda, modifier = Modifier.size(16.dp))
+                            Icon(if (aceptado) Icons.Default.Verified else Icons.Default.Info, null, tint = colorEstado, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("SUNAT BETA", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = VerdeEsmeralda)
+                            Text(if (aceptado) "ACEPTADO" else if (rechazado) "RECHAZADO" else "PENDIENTE", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = colorEstado)
                         }
                     }
                 }
@@ -3431,9 +3445,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("POLLERÍA WENDY'S FOOD S.A.C.", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = c.textoPrincipal)
-                            Text("RUC: 20609123456 · Carretera Central Km 19.5, Ñaña", fontSize = 11.sp, color = c.textoSecundario)
-                            Text("Autorizado por SUNAT Beta mediante Facturación Electrónica", fontSize = 10.sp, color = c.textoSecundario)
+                            Text(comp.razonSocialEmisor ?: "Wendy’s Food", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = c.textoPrincipal)
+                            Text("RUC: ${comp.rucEmisor.orEmpty()}", fontSize = 11.sp, color = c.textoSecundario)
+                            Text("Ambiente de pruebas SUNAT Beta", fontSize = 10.sp, color = c.textoSecundario)
                         }
                     }
 
@@ -3464,7 +3478,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Estado SUNAT:", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(comp.estadoFinal, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = VerdeEsmeralda)
+                                Text(comp.estadoFinal.replace("_", " "), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (comp.estadoFinal == "ACEPTADO") VerdeEsmeralda else if (comp.estadoFinal == "RECHAZADO") RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo)
                             }
                         }
                     }
@@ -3480,10 +3494,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(Icons.Default.QrCode2, null, modifier = Modifier.size(84.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
+                            Icon(if (comp.estadoFinal == "ACEPTADO") Icons.Default.Verified else Icons.Default.ReceiptLong, null, modifier = Modifier.size(44.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
                             Text(comp.descripcionFinal, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal, textAlign = TextAlign.Center)
-                            Text("Firma Digital Hash: ${comp.hashFinal.take(20)}...", fontSize = 10.sp, color = c.textoSecundario)
+                            Text(if (comp.hashFinal.isBlank()) "Firma digital pendiente" else "Hash: ${comp.hashFinal.take(20)}…", fontSize = 10.sp, color = c.textoSecundario)
                         }
+                    }
+
+                    s.pendientesEmision.firstOrNull { it.idPago == comp.idPago }?.let { solicitud ->
+                        OutlinedButton(onClick = { vm.recuperarComprobante(solicitud) }, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) { Text("Reintentar emisión SUNAT") }
                     }
 
                     // Cuadro de Totales

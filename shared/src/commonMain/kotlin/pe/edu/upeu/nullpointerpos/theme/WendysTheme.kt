@@ -86,10 +86,10 @@ val LocalColores = staticCompositionLocalOf {
 }
 
 val WendyShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
+    extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(18.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(20.dp),
     extraLarge = RoundedCornerShape(24.dp)
 )
 

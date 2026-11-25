@@ -31,7 +31,10 @@ actual fun preferencias(): Preferencias = object : Preferencias {
     override fun guardar(clave: String, valor: String) { prefs.edit().putString(clave, valor).commit() }
 }
 actual fun motorHttp(): HttpClientEngine = OkHttp.create()
-actual fun servidorInicial() = "http://localhost:8080"
+actual fun servidorInicial(): String {
+    val emulador = android.os.Build.FINGERPRINT.startsWith("generic") || android.os.Build.MODEL.contains("sdk_gphone", ignoreCase = true)
+    return if (emulador) "http://10.0.2.2:8080" else "http://localhost:8080"
+}
 actual fun avisarPedido() {
     runCatching { val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70); tone.startTone(ToneGenerator.TONE_PROP_ACK, 180); Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 400) }
 }
@@ -92,6 +95,25 @@ actual fun WendysLogo(modifier: Modifier) {
     } else {
         Box(modifier.background(Borgona, CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.LocalFireDepartment, null, tint = AmbarDorado)
+        }
+    }
+}
+
+@Composable
+actual fun ActualizarBarrasSistema(oscuro: Boolean) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            val mascara = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            view.windowInsetsController?.setSystemBarsAppearance(if (oscuro) 0 else mascara, mascara)
+        } else {
+            @Suppress("DEPRECATION")
+            val mascara = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+                (if (android.os.Build.VERSION.SDK_INT >= 26) android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0)
+            @Suppress("DEPRECATION")
+            val actual = view.systemUiVisibility
+            @Suppress("DEPRECATION")
+            view.systemUiVisibility = if (oscuro) actual and mascara.inv() else actual or mascara
         }
     }
 }

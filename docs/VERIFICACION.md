@@ -1,5 +1,15 @@
 # Verificación de la entrega
 
+## Ajuste de interfaz del 25 de noviembre de 2026
+
+Se recuperaron las pantallas, el menú lateral, los botones y la distribución de la app original. Se añadieron transiciones suaves a filtros y mesas, ligeros ajustes de bordes y contraste de las barras del sistema.
+
+Se conservan las correcciones de API, la distinción entre Yape y Plin, los importes negativos, las claves de idempotencia de cobro y la recuperación de comprobantes pendientes. El estado de emisión se muestra según la respuesta del backend.
+
+Las comprobaciones de Android se ejecutan sobre esta versión. La compilación iOS requiere macOS y Xcode. El registro que sigue corresponde a la entrega inicial.
+
+---
+
 Autor: Randy Huaman.
 
 ## Comprobado

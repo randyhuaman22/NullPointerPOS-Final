@@ -217,5 +217,8 @@ data class AuditoriaRegistro(
         }
 }
 
-fun dinero(centimos: Long): String = "S/ ${centimos / 100}.${(centimos % 100).toString().padStart(2, '0')}"
+fun dinero(centimos: Long): String {
+    val signo = if (centimos < 0) "-" else ""
+    return "S/ $signo${kotlin.math.abs(centimos / 100)}.${kotlin.math.abs(centimos % 100).toString().padStart(2, '0')}"
+}
 fun List<Linea>.total(): Long = sumOf { it.precioCentimos * it.cantidad }

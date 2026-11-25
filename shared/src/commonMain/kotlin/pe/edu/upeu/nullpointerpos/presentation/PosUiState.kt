@@ -12,6 +12,7 @@ data class PosUiState(
     val mensaje: String? = null,
     val pagina: String = "Salón",
     val modoOscuro: Boolean = false,
+    val pendientesEmision: List<pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante> = emptyList(),
 
     // Salón y Menú
     val mesas: List<Mesa> = emptyList(),

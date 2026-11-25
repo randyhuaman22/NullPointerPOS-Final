@@ -13,3 +13,6 @@ expect fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boo
 
 @Composable
 expect fun WendysLogo(modifier: Modifier = Modifier)
+
+@Composable
+expect fun ActualizarBarrasSistema(oscuro: Boolean)

@@ -7,11 +7,9 @@ import pe.edu.upeu.nullpointerpos.data.remote.dto.*
 import pe.edu.upeu.nullpointerpos.data.mapper.*
 import pe.edu.upeu.nullpointerpos.domain.model.*
 import pe.edu.upeu.nullpointerpos.domain.repository.PosRepository
-import kotlin.random.Random
 
 class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocket) : PosRepository {
-    private fun nuevaIdempotencia() = "IDEM-${Clock_now()}-${Random.nextLong(1000, 9999)}"
-    private fun Clock_now() = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    private fun idempotenciaCobro(idPedido: Long) = "APP-PAGO-$idPedido"
 
     // --- SPRINT 1 ---
     override suspend fun login(codigo: String, pin: String) =
@@ -56,12 +54,12 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun resumenPago(idPedido: Long) = api.resumenPago(idPedido)
 
     override suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double): CobroResultado {
-        val idem = nuevaIdempotencia()
+        val idem = idempotenciaCobro(idPedido)
         return api.cobrarEfectivo(CobroEfectivoRequest(idPedido, recibido, idem, idTurno, total, idem)).dominio()
     }
 
     override suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String): CobroResultado {
-        val idem = nuevaIdempotencia()
+        val idem = idempotenciaCobro(idPedido)
         val met = metodo.uppercase()
         val op = operacion.trim()
         require(op.isNotBlank()) { "Ingresa el número de operación o voucher." }
@@ -70,7 +68,7 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     }
 
     override suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>): CobroResultado {
-        val idem = nuevaIdempotencia()
+        val idem = idempotenciaCobro(idPedido)
         val partesDto = partes.map { (metodo, imp, op) ->
             val met = metodo.uppercase()
             val u4 = if (met.equals("EFECTIVO", ignoreCase = true)) null else (op?.takeLast(4)?.padStart(4, '0') ?: "0000")
@@ -92,7 +90,7 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
 
     // --- SPRINT 3 ---
     override suspend fun buscarCliente(tipo: String, numero: String): ClienteDoc? {
-        val res = runCatching { api.buscarCliente(tipo.trim().uppercase(), numero.trim()) }.getOrNull() ?: return null
+        val res = api.buscarCliente(tipo.trim().uppercase(), numero.trim()) ?: return null
         return ClienteDoc(res.tipoDocumento, res.numeroDocumento, res.razonSocialFinal, res.direccion)
     }
 

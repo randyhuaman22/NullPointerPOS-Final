@@ -106,6 +106,7 @@ class PosViewModel(
             busy = true,
             pagina = destino,
             modoOscuro = store.modoOscuro,
+            pendientesEmision = store.emisiones(sesion.usuario.codigoTrabajador),
             borradores = store.borradores(sesion.usuario.codigoTrabajador)
         )
         if (_state.value.puedeCocina) iniciarCocina()
@@ -170,6 +171,9 @@ class PosViewModel(
                     borrador = borradorActualizado
                 )
             }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            if (e is Exception) fallo(e)
         }
     }
 
@@ -508,13 +512,14 @@ class PosViewModel(
             launch {
                 while (isActive) {
                     runCatching {
-                        _state.update { it.copy(socketConectado = true, cocinaAviso = null) }
                         socket.eventos().collect {
+                            _state.update { it.copy(socketConectado = true, cocinaAviso = null) }
                             refrescarCocina()
                             if (_state.value.puedeMesas) cargarSalon()
                             if (_state.value.puedeCaja) cargarCajaDatos()
                         }
                     }.onFailure { e ->
+                        if (e is CancellationException) throw e
                         _state.update { it.copy(socketConectado = false, cocinaAviso = "KDS: ${e.message}") }
                         delay(5000)
                     }
@@ -532,6 +537,9 @@ class PosViewModel(
         runCatching {
             val turno = repo.turnoAbierto()
             _state.update { it.copy(turnoCaja = if (turno != null && turno.estado == "ABIERTO") turno else null) }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            if (e is Exception) fallo(e)
         }
     }
 
@@ -546,6 +554,9 @@ class PosViewModel(
                 } else actual
                 s.copy(pendientesCobro = pendientes, pedido = actualizado)
             }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            if (e is Exception) fallo(e)
         }
     }
 
@@ -665,9 +676,12 @@ class PosViewModel(
                 correo = correo?.trim()?.ifBlank { null },
                 telefono = telefonoWhatsapp?.trim()?.ifBlank { null }
             )
-            runCatching { repo.emitirComprobanteSunat(reqComp) }
-                .onSuccess { comprobante = it }
-                .onFailure { avisoExtra += " · SUNAT: ${it.message}" }
+            guardarEmisionPendiente(reqComp)
+            try {
+                comprobante = repo.emitirComprobanteSunat(reqComp)
+                actualizarEmisionPendiente(reqComp, comprobante)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { avisoExtra += " · Comprobante pendiente. Puedes recuperarlo desde Caja: ${e.message}" }
         }
 
         var whatsappRes: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto? = null
@@ -798,9 +812,30 @@ class PosViewModel(
         _state.update {
             it.copy(
                 comprobanteEmitido = res,
-                mensaje = "Comprobante ${res.numeroFinal} emitido y aprobado por SUNAT Beta"
+                mensaje = "Comprobante ${res.numeroFinal}: ${res.estadoFinal}"
             )
         }
+    }
+
+    private fun guardarEmisionPendiente(solicitud: pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante) {
+        val codigo = _state.value.sesion?.usuario?.codigoTrabajador ?: return
+        val lista = _state.value.pendientesEmision.filterNot { it.idPago == solicitud.idPago } + solicitud
+        store.guardarEmisiones(codigo, lista)
+        _state.update { it.copy(pendientesEmision = lista) }
+    }
+
+    private fun actualizarEmisionPendiente(solicitud: pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante, respuesta: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat) {
+        if (respuesta.estadoFinal.startsWith("PENDIENTE")) return
+        val codigo = _state.value.sesion?.usuario?.codigoTrabajador ?: return
+        val lista = _state.value.pendientesEmision.filterNot { it.idPago == solicitud.idPago }
+        store.guardarEmisiones(codigo, lista)
+        _state.update { it.copy(pendientesEmision = lista) }
+    }
+
+    fun recuperarComprobante(solicitud: pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante) = task {
+        val respuesta = repo.emitirComprobanteSunat(solicitud)
+        actualizarEmisionPendiente(solicitud, respuesta)
+        _state.update { it.copy(comprobanteEmitido = respuesta, mensaje = "Comprobante ${respuesta.numeroFinal}: ${respuesta.estadoFinal}") }
     }
 
     fun cerrarComprobanteModal() {
@@ -808,8 +843,9 @@ class PosViewModel(
     }
 
     fun buscarCliente(tipo: String, numero: String) = task {
+        _state.update { it.copy(clienteSeleccionado = null) }
         val cli = repo.buscarCliente(tipo, numero)
-        _state.update { it.copy(clienteSeleccionado = cli, mensaje = if (cli != null) "Cliente encontrado: ${cli.razonSocial}" else "Cliente no registrado en SUNAT") }
+        _state.update { it.copy(clienteSeleccionado = cli, mensaje = if (cli != null) "Cliente encontrado: ${cli.razonSocial}" else "No se encontraron datos del cliente") }
     }
 
     fun ticketWhatsApp(idPedido: Long, telefono: String) = task {

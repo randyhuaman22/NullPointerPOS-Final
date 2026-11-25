@@ -98,7 +98,8 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
         call("caja/apertura", HttpMethod.Post, AperturaCajaRequest(montoInicial)).body()
 
     suspend fun turnoAbierto(): TurnoCajaResponse? {
-        return runCatching { call("caja/turno-abierto").body<TurnoCajaResponse>() }.getOrNull()
+        return try { call("caja/turno-abierto").body<TurnoCajaResponse>() }
+        catch (e: FalloApi) { if (e.codigo == 404) null else throw e }
     }
 
     suspend fun cobrarEfectivo(b: CobroEfectivoRequest): RespuestaPagoDto =
@@ -121,7 +122,8 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
 
     // --- SPRINT 3 ---
     suspend fun buscarCliente(tipo: String, numero: String): ClienteDto? {
-        return runCatching { call("clientes/$tipo/$numero").body<ClienteDto>() }.getOrNull()
+        return try { call("clientes/$tipo/$numero").body<ClienteDto>() }
+        catch (e: FalloApi) { if (e.codigo == 404) null else throw e }
     }
 
     suspend fun guardarCliente(b: ClienteDto) {

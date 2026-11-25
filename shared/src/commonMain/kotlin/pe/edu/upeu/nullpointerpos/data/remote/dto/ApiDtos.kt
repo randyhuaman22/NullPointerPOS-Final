@@ -382,7 +382,7 @@ data class RespuestaComprobanteSunat(
     val numeroFinal: String get() = numeroCompleto.ifBlank { numeroComprobante.ifBlank { listOf(serie, (correlativo ?: numero.takeIf { it > 0 })?.toString().orEmpty()).filter { it.isNotBlank() }.joinToString("-") } }
     val hashFinal: String get() = hashCpe?.ifBlank { null } ?: codigoHash
     val qrFinal: String get() = cadenaQr?.ifBlank { null } ?: codigoQr
-    val descripcionFinal: String get() = descripcionCdr?.ifBlank { null } ?: descripcionSunat.ifBlank { "Aceptado por SUNAT Beta" }
+    val descripcionFinal: String get() = descripcionCdr?.ifBlank { null } ?: descripcionSunat.ifBlank { "Consulta el estado de emisión del comprobante." }
     val estadoFinal: String get() = estadoSunat.ifBlank { estado }
     val receptorFinal: String? get() = denominacionReceptor?.ifBlank { null } ?: nombreReceptor?.ifBlank { null }
 }
