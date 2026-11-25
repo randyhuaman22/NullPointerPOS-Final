@@ -53,17 +53,26 @@ data class DetalleDto(
 @Serializable
 data class PedidoDto(
     val idPedido: Long,
-    val codigoPedido: String,
-    val idMesa: Long,
-    val codigoMesa: String,
+    val codigoPedido: String = "",
+    val idMesa: Long = 0L,
+    val codigoMesa: String = "",
+    val idUsuarioMozo: Long = 0L,
     val codigoMozo: String? = null,
-    val estado: String,
-    val importeTotal: JsonPrimitive,
+    val estado: String = "BORRADOR",
+    val subtotal: JsonPrimitive? = null,
+    val totalDescuento: JsonPrimitive? = null,
+    val importeTotal: JsonPrimitive = JsonPrimitive("0.00"),
+    val fechaCreacion: String? = null,
     val fechaEnvio: String? = null,
+    val fechaPago: String? = null,
     val detalles: List<DetalleDto> = emptyList(),
     val observaciones: String? = null,
     val descuentoTotal: JsonPrimitive? = null,
-    val porcentajeDescuento: Double? = null
+    val porcentajeDescuento: Double? = null,
+    val segundosTranscurridos: Long? = null,
+    val minutosTranscurridos: Long? = null,
+    val nivelDemora: String? = null,
+    val siguienteUmbralMinutos: Int? = null
 )
 
 @Serializable
@@ -80,7 +89,7 @@ data class CrearUsuarioRequest(
 
 // DTOs de Cocina (Sprint 2)
 @Serializable
-data class DisponibilidadProductoRequest(val idProducto: Long, val disponible: Boolean)
+data class DisponibilidadProductoRequest(val idProducto: Long, val disponible: Boolean, val motivo: String? = null)
 
 // DTOs de Caja (Sprint 2 y 3)
 @Serializable
@@ -109,6 +118,19 @@ data class ResumenPagoDto(
     val estado: String,
     val importeTotal: JsonPrimitive,
     val totalDescuento: JsonPrimitive? = null
+)
+
+@Serializable
+data class RespuestaPagoDto(
+    val idPago: Long = 0L,
+    val idPedido: Long = 0L,
+    val idTurno: Long? = null,
+    val metodo: String = "",
+    val importe: JsonPrimitive = JsonPrimitive("0.00"),
+    val importeRecibido: JsonPrimitive? = null,
+    val vuelto: JsonPrimitive? = null,
+    val estado: String = "",
+    val fechaCreacion: String? = null
 )
 
 @Serializable
@@ -191,8 +213,7 @@ data class ClienteDto(
 @Serializable
 data class TicketWhatsAppRequest(
     val idPedido: Long,
-    val numeroTelefono: String,
-    val idTurnoCaja: Long
+    val telefono: String
 )
 
 @Serializable
@@ -242,14 +263,7 @@ data class CrearInsumoRequest(
 @Serializable
 data class IngredienteRecetaDto(
     val idInsumo: Long,
-    val cantidadRequerida: Double,
-    val unidadMedida: String
-)
-
-@Serializable
-data class RecetaRequest(
-    val idProducto: Long,
-    val ingredientes: List<IngredienteRecetaDto>
+    val cantidadPorPlato: Double
 )
 
 @Serializable
@@ -262,70 +276,106 @@ data class ItemCompraDto(
 @Serializable
 data class CompraRequest(
     val proveedor: String,
-    val numeroDocumento: String,
-    val items: List<ItemCompraDto>,
-    val observaciones: String = ""
+    val documento: String = "",
+    val observacion: String? = null,
+    val items: List<ItemCompraDto>
 )
 
 @Serializable
 data class MermaRequest(
     val idInsumo: Long,
     val cantidad: Double,
-    val motivo: String,
-    val observaciones: String = ""
+    val motivo: String
 )
 
 // DTOs de Reportes y Auditoria (Sprint 3 - Tolerantes a snake_case)
 @Serializable
 data class SolicitudSimularTarjeta(
     val numeroTarjeta: String,
-    val mesExpiracion: String,
-    val anioExpiracion: String,
+    val mesVencimiento: Int,
+    val anioVencimiento: Int,
     val cvv: String,
-    val titular: String,
-    val monto: Double
+    val titular: String
 )
 
 @Serializable
 data class RespuestaSimuladorTarjeta(
-    val aprobado: Boolean,
-    val codigoAutorizacion: String,
-    val mensaje: String,
-    val ultimosCuatroDigitos: String,
-    val marcaTarjeta: String,
-    val referencia: String
-)
+    val aprobada: Boolean = false,
+    val aprobado: Boolean? = null,
+    val marca: String? = null,
+    val marcaTarjeta: String? = null,
+    val ultimos4Digitos: String? = null,
+    val ultimosCuatroDigitos: String? = null,
+    val codigoAutorizacion: String? = null,
+    val numeroOperacion: String? = null,
+    val referencia: String? = null,
+    val titular: String? = null,
+    val mensaje: String = ""
+) {
+    val aprobadaFinal: Boolean get() = aprobada || (aprobado == true)
+    val marcaFinal: String get() = marca?.ifBlank { null } ?: marcaTarjeta?.ifBlank { null } ?: "TARJETA"
+    val ultimos4Final: String get() = ultimos4Digitos?.ifBlank { null } ?: ultimosCuatroDigitos?.ifBlank { null } ?: "0000"
+    val numeroOperacionFinal: String get() = numeroOperacion?.ifBlank { null } ?: referencia?.ifBlank { null } ?: codigoAutorizacion?.ifBlank { null } ?: ""
+}
 
 @Serializable
 data class SolicitudEmitirComprobante(
     val idPedido: Long,
-    val idTurnoCaja: Long,
-    val tipoComprobante: String,
-    val serie: String? = null,
-    val tipoDocumentoCliente: String,
-    val numeroDocumentoCliente: String,
-    val razonSocialCliente: String,
-    val correoEnvio: String? = null
+    val idPago: Long,
+    val modalidad: String = "SIN_DATOS",
+    val tipoComprobante: String = "BOLETA",
+    val tipoDocumento: String? = null,
+    val numeroDocumento: String? = null,
+    val nombreCompleto: String? = null,
+    val direccion: String? = null,
+    val correo: String? = null,
+    val telefono: String? = null
 )
 
 @Serializable
 data class RespuestaComprobanteSunat(
-    val idComprobante: Long,
-    val tipoComprobante: String,
-    val serie: String,
-    val numero: Long,
-    val numeroComprobante: String,
-    val estadoSunat: String,
-    val descripcionSunat: String,
-    val codigoHash: String,
-    val codigoQr: String,
-    val totalGravado: Double,
-    val totalIgv: Double,
-    val totalImporte: Double,
-    val fechaEmision: String,
+    val idComprobante: Long = 0L,
+    val idPedido: Long = 0L,
+    val idPago: Long = 0L,
+    val tipoComprobante: String = "BOLETA",
+    val serie: String = "",
+    val correlativo: Long? = null,
+    val numero: Long = 0L,
+    val numeroCompleto: String = "",
+    val numeroComprobante: String = "",
+    val modalidad: String = "",
+    val rucEmisor: String? = null,
+    val razonSocialEmisor: String? = null,
+    val tipoDocumentoReceptor: String? = null,
+    val numeroDocumentoReceptor: String? = null,
+    val denominacionReceptor: String? = null,
+    val nombreReceptor: String? = null,
+    val direccionReceptor: String? = null,
+    val moneda: String? = null,
+    val metodoPago: String? = null,
+    val estado: String = "EMITIDO_BETA",
+    val estadoSunat: String = "",
+    val codigoCdr: String? = null,
+    val descripcionCdr: String? = null,
+    val descripcionSunat: String = "",
+    val hashCpe: String? = null,
+    val codigoHash: String = "",
+    val cadenaQr: String? = null,
+    val codigoQr: String = "",
+    val totalGravado: Double = 0.0,
+    val totalIgv: Double = 0.0,
+    val totalImporte: Double = 0.0,
+    val fechaEmision: String = "",
     val urlPdf: String? = null,
     val urlXml: String? = null
-)
+) {
+    val numeroFinal: String get() = numeroCompleto.ifBlank { numeroComprobante.ifBlank { listOf(serie, (correlativo ?: numero.takeIf { it > 0 })?.toString().orEmpty()).filter { it.isNotBlank() }.joinToString("-") } }
+    val hashFinal: String get() = hashCpe?.ifBlank { null } ?: codigoHash
+    val qrFinal: String get() = cadenaQr?.ifBlank { null } ?: codigoQr
+    val descripcionFinal: String get() = descripcionCdr?.ifBlank { null } ?: descripcionSunat.ifBlank { "Aceptado por SUNAT Beta" }
+    val estadoFinal: String get() = estadoSunat.ifBlank { estado }
+    val receptorFinal: String? get() = denominacionReceptor?.ifBlank { null } ?: nombreReceptor?.ifBlank { null }
+}
 
 @Serializable
 data class VentaPorHoraDto(
@@ -360,17 +410,19 @@ data class PlatoPopularDto(
 data class AuditoriaPedidoDto(
     @SerialName("id_registro_auditoria") val id_registro_auditoria: Long? = null,
     @SerialName("idAuditoria") val idAuditoriaAlt: Long? = null,
-    @SerialName("id_entidad") val id_entidad: Long? = null,
+    @SerialName("nombre_entidad") val nombre_entidad: String? = null,
+    @SerialName("id_entidad") val id_entidad: JsonPrimitive? = null,
     @SerialName("idPedido") val idPedidoAlt: Long? = null,
     val accion: String = "",
     @SerialName("id_usuario_actor") val id_usuario_actor: JsonPrimitive? = null,
     val usuario: String? = null,
-    val motivo: String = "",
+    val motivo: String? = null,
     @SerialName("fecha_creacion") val fecha_creacion: String? = null,
     @SerialName("fechaHora") val fechaHoraAlt: String? = null
 ) {
     val idAuditoria: Long get() = id_registro_auditoria ?: idAuditoriaAlt ?: 0L
-    val idPedido: Long get() = id_entidad ?: idPedidoAlt ?: 0L
+    val idPedido: Long get() = id_entidad?.content?.toLongOrNull() ?: idPedidoAlt ?: 0L
+    val motivoFinal: String get() = motivo.orEmpty()
     val usuarioActor: String get() = usuario ?: id_usuario_actor?.content ?: "Sistema"
     val fechaHora: String get() = fecha_creacion ?: fechaHoraAlt ?: ""
 }

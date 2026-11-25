@@ -110,7 +110,7 @@ class PosViewModel(
         )
         if (_state.value.puedeCocina) iniciarCocina()
         if (_state.value.puedeMesas) cargarSalon()
-        if (_state.value.puedeCaja) cargarTurnoCaja()
+        if (_state.value.puedeCaja) cargarCajaDatos()
         if (_state.value.puedeAlmacen) cargarInventario()
         if (_state.value.puedeReportes) cargarReportes()
     }
@@ -126,7 +126,50 @@ class PosViewModel(
             val mesas = repo.mesas()
             val categorias = repo.categorias()
             val productos = repo.productos()
-            _state.update { it.copy(mesas = mesas, categorias = categorias, productos = productos) }
+            val productosTodos = runCatching { repo.todosProductos() }.getOrDefault(productos)
+            val pedidosSalonRes = runCatching { repo.pedidosActivosSalon() }
+            val sActual = _state.value
+            val pedidosSalon = pedidosSalonRes.getOrElse { sActual.pedidosSalon }
+            val borradoresLimpiados = if (pedidosSalonRes.isSuccess) {
+                val idsActivos = pedidosSalon.map { it.idPedido }.toSet()
+                val mesasOcupadas = pedidosSalon.map { it.idMesa }.toSet()
+                val filtrados = sActual.borradores.filter { b ->
+                    when {
+                        b.idPedido != null -> b.idPedido in idsActivos
+                        b.idMesa in mesasOcupadas -> false
+                        else -> true
+                    }
+                }
+                val codigo = sActual.sesion?.usuario?.codigoTrabajador
+                if (codigo != null && filtrados != sActual.borradores) {
+                    store.guardar(codigo, filtrados)
+                }
+                filtrados
+            } else sActual.borradores
+
+            val idsActivos = pedidosSalon.map { it.idPedido }.toSet()
+            val mesaActualizada = sActual.mesa?.let { ma -> mesas.find { it.idMesa == ma.idMesa } ?: ma }
+            val pedidoActualizado = if (pedidosSalonRes.isSuccess && sActual.pedido?.idPedido != null) {
+                if (sActual.pedido.idPedido in idsActivos) pedidosSalon.find { it.idPedido == sActual.pedido.idPedido } ?: sActual.pedido
+                else if (sActual.pagina == "Comanda") null else sActual.pedido
+            } else sActual.pedido
+            val borradorActualizado = if (pedidosSalonRes.isSuccess && sActual.borrador?.idPedido != null && sActual.borrador.idPedido !in idsActivos) {
+                mesaActualizada?.let { Borrador(it.idMesa) }
+            } else sActual.borrador
+
+            _state.update {
+                it.copy(
+                    mesas = mesas,
+                    categorias = categorias,
+                    productos = productos,
+                    productosTodos = productosTodos,
+                    pedidosSalon = pedidosSalon,
+                    borradores = borradoresLimpiados,
+                    mesa = mesaActualizada,
+                    pedido = pedidoActualizado,
+                    borrador = borradorActualizado
+                )
+            }
         }
     }
 
@@ -135,7 +178,7 @@ class PosViewModel(
         when (s.pagina) {
             "Cocina" -> if (s.puedeCocina) refrescarCocina()
             "Usuarios" -> if (s.puedeAdmin) { val u = repo.usuarios(); _state.update { it.copy(usuarios = u) } }
-            "Caja" -> { cargarTurnoCaja(); if (s.puedeMesas) cargarSalon() }
+            "Caja" -> { cargarCajaDatos(); if (s.puedeMesas) cargarSalon() }
             "Almacén", "Stock" -> if (s.puedeAlmacen) cargarInventario()
             "Reportes" -> if (s.puedeReportes) cargarReportes()
             else -> if (s.puedeMesas) cargarSalon()
@@ -156,7 +199,7 @@ class PosViewModel(
         task {
             when (pagina) {
                 "Usuarios" -> { val u = repo.usuarios(); _state.update { it.copy(usuarios = u) } }
-                "Caja" -> { cargarTurnoCaja(); if (s.puedeMesas) cargarSalon() }
+                "Caja" -> { cargarCajaDatos(); if (s.puedeMesas) cargarSalon() }
                 "Almacén", "Stock" -> cargarInventario()
                 "Reportes" -> cargarReportes()
                 "Salón", "Mesas" -> cargarSalon()
@@ -175,62 +218,144 @@ class PosViewModel(
 
     fun abrir(m: Mesa) {
         if (_state.value.busy) return
-        val previo = _state.value.borradores.find { it.idMesa == m.idMesa }
-        _state.update { it.copy(mesa = m, pedido = null, borrador = previo ?: Borrador(m.idMesa), pagina = "Comanda", error = null, mensaje = null) }
+        val s = _state.value
+        val activoEnMesa = s.pedidosSalon.find { it.idMesa == m.idMesa }
+        val miCodigo = s.sesion?.usuario?.codigoTrabajador.orEmpty()
+        val esAdmin = s.rol.uppercase() == "ADMINISTRADOR"
+        val borradorLocal = s.borradores.find { it.idMesa == m.idMesa }
 
-        // Si hay comanda local guardada con ID, recuperarla
-        if (previo?.idPedido != null) {
-            recuperar(previo.idPedido.toString())
+        if (activoEnMesa != null) {
+            val esPropioOAdmin = esAdmin || activoEnMesa.codigoMozo.equals(miCodigo, ignoreCase = true)
+            val avisoLectura = if (!esPropioOAdmin) {
+                "Mesa atendida por ${activoEnMesa.codigoMozo} (${activoEnMesa.estado.replace('_', ' ')}). Vista de solo lectura."
+            } else null
+            val b = Borrador(
+                idMesa = m.idMesa,
+                lineas = activoEnMesa.lineas.filter { it.estado != "ANULADO" },
+                observaciones = activoEnMesa.observaciones.orEmpty(),
+                idPedido = activoEnMesa.idPedido,
+                creacionIncierta = false
+            )
+            _state.update {
+                it.copy(
+                    mesa = m,
+                    pedido = activoEnMesa,
+                    borrador = b,
+                    pagina = "Comanda",
+                    modoSoloLecturaAviso = avisoLectura,
+                    error = null,
+                    mensaje = null
+                )
+            }
+            if (esPropioOAdmin) {
+                recuperar(activoEnMesa.idPedido.toString())
+            }
+            return
+        }
+
+        if (m.estado == "LIBRE" && borradorLocal?.idPedido != null) {
+            val cod = s.sesion?.usuario?.codigoTrabajador
+            val limpios = s.borradores.filterNot { it.idMesa == m.idMesa }
+            if (cod != null) store.guardar(cod, limpios)
+            _state.update {
+                it.copy(
+                    borradores = limpios,
+                    mesa = m,
+                    pedido = null,
+                    borrador = Borrador(m.idMesa),
+                    pagina = "Comanda",
+                    modoSoloLecturaAviso = null,
+                    error = null,
+                    mensaje = null
+                )
+            }
+            return
+        }
+
+        _state.update {
+            it.copy(
+                mesa = m,
+                pedido = null,
+                borrador = borradorLocal ?: Borrador(m.idMesa),
+                pagina = "Comanda",
+                modoSoloLecturaAviso = null,
+                error = null,
+                mensaje = null
+            )
+        }
+
+        if (borradorLocal?.idPedido != null) {
+            recuperar(borradorLocal.idPedido.toString())
         } else if (m.estado == "OCUPADA") {
-            // Si la mesa está ocupada y no está en este equipo, buscar si está en la cocina o consultar por código
-            val ordenCocina = _state.value.cocina.find { it.idMesa == m.idMesa || it.codigoMesa == m.codigoMesa }
-            if (ordenCocina != null) {
+            val ordenCocina = s.cocina.find { it.idMesa == m.idMesa || it.codigoMesa == m.codigoMesa }
+            if (ordenCocina != null && (esAdmin || ordenCocina.codigoMozo.equals(miCodigo, ignoreCase = true))) {
                 recuperar(ordenCocina.idPedido.toString())
+            } else {
+                task {
+                    cargarSalon()
+                    val actualizado = _state.value.pedidosSalon.find { it.idMesa == m.idMesa }
+                    if (actualizado != null) {
+                        val propio = esAdmin || actualizado.codigoMozo.equals(miCodigo, ignoreCase = true)
+                        _state.update {
+                            it.copy(
+                                pedido = actualizado,
+                                borrador = Borrador(
+                                    m.idMesa,
+                                    actualizado.lineas.filter { l -> l.estado != "ANULADO" },
+                                    actualizado.observaciones.orEmpty(),
+                                    actualizado.idPedido,
+                                    false
+                                ),
+                                modoSoloLecturaAviso = if (propio) null else "Mesa atendida por ${actualizado.codigoMozo}. Vista de solo lectura."
+                            )
+                        }
+                    } else {
+                        _state.update { it.copy(error = "La mesa ${m.codigoMesa} figura ocupada en el servidor. Pulsa Recargar para actualizar.") }
+                    }
+                }
             }
         }
     }
 
+    fun seleccionarPedidoCaja(p: Pedido?) {
+        _state.update { it.copy(pedido = p, transaccionTarjeta = null, error = null, mensaje = null) }
+    }
+
+    fun cargarPedidoCaja(texto: String) = task {
+        val id = texto.toLongOrNull(); require(id != null && id > 0) { "Ingresa un ID de pedido válido." }
+        val p = repo.pedidoPendienteCobro(id)
+        _state.update { it.copy(pedido = p, transaccionTarjeta = null, mensaje = "Cuenta ${p.codigoPedido} (${p.codigoMesa}) cargada para cobro") }
+    }
+
     fun recuperar(texto: String) = task {
         val id = texto.toLongOrNull(); require(id != null && id > 0) { "Ingresa un ID de pedido válido." }
-        val p = runCatching {
-            repo.pedido(id)
-        }.getOrElse {
-            // Simulación fallback para Cajero cuando orders-service restringe GET /pedidos a MOZO/ADMIN
-            val mesaSim = _state.value.mesas.find { it.idMesa == id }
-            val codMesa = mesaSim?.codigoMesa ?: "M-0${((id - 1) % 8 + 1)}"
-            val lineasSim: List<Linea> = when ((id % 3L).toInt()) {
-                0 -> listOf(
-                    Linea(idProducto = 1L, nombre = "1/2 Pollo a la Brasa", precioCentimos = 4200L, cantidad = 1, observaciones = "Papas crocantes, ensalada clásica", estado = "LISTO"),
-                    Linea(idProducto = 4L, nombre = "1/4 Pollo a la Brasa", precioCentimos = 2300L, cantidad = 1, observaciones = "Papas y cremas variadas", estado = "LISTO"),
-                    Linea(idProducto = 9L, nombre = "Inca Kola 1.5L Personal", precioCentimos = 1200L, cantidad = 1, observaciones = "Bien helada con vasos", estado = "LISTO")
-                )
-                1 -> listOf(
-                    Linea(idProducto = 2L, nombre = "1 Pollo a la Brasa Entero", precioCentimos = 7800L, cantidad = 1, observaciones = "Porción familiar de papas y ensalada", estado = "LISTO"),
-                    Linea(idProducto = 7L, nombre = "Mollejitas a la Parrilla", precioCentimos = 2800L, cantidad = 1, observaciones = "Con chimichurri casero", estado = "LISTO"),
-                    Linea(idProducto = 10L, nombre = "Chicha Morada Clásica Jarra 1L", precioCentimos = 1600L, cantidad = 1, observaciones = "Helada con limón", estado = "LISTO")
-                )
-                else -> listOf(
-                    Linea(idProducto = 3L, nombre = "Anticuchos de Corazón (3 Palos)", precioCentimos = 3200L, cantidad = 1, observaciones = "Papas doradas y choclo tierno", estado = "LISTO"),
-                    Linea(idProducto = 4L, nombre = "1/4 Pollo a la Brasa", precioCentimos = 2300L, cantidad = 1, observaciones = "Papas fritas", estado = "LISTO"),
-                    Linea(idProducto = 8L, nombre = "Chicha Morada 500ml", precioCentimos = 800L, cantidad = 2, observaciones = "Helada", estado = "LISTO")
+        val p = repo.pedido(id)
+        if (p.estado in listOf("PAGADO", "ANULADO")) {
+            liberarMesaYLimpiarPedido(p.idPedido, p.idMesa)
+            _state.update {
+                it.copy(
+                    pedido = null,
+                    borrador = null,
+                    modoSoloLecturaAviso = null,
+                    mensaje = "El pedido ${p.codigoPedido} ya figura como ${p.estado.lowercase()}. Mesa liberada."
                 )
             }
-            val totCent = lineasSim.sumOf { it.precioCentimos * it.cantidad }
-            Pedido(
-                idPedido = id,
-                codigoPedido = "PED-${id.toString().padStart(4, '0')}",
-                idMesa = id,
-                codigoMesa = codMesa,
-                codigoMozo = "MOZ001",
-                estado = "EN_PREPARACION",
-                importeCentimos = totCent,
-                fechaEnvio = "2026-11-19 13:30:00",
-                lineas = lineasSim,
-                observaciones = "Atención en $codMesa. Pago rápido solicitado."
-            )
+            cargarSalon()
+            return@task
         }
         val previo = _state.value.borrador
-        _state.update { it.copy(pedido = p, mesa = _state.value.mesas.find { it.idMesa == p.idMesa } ?: _state.value.mesa, error = null) }
+        val esAdmin = _state.value.rol.uppercase() == "ADMINISTRADOR"
+        val miCodigo = _state.value.sesion?.usuario?.codigoTrabajador.orEmpty()
+        val propio = esAdmin || p.codigoMozo.equals(miCodigo, ignoreCase = true)
+        _state.update {
+            it.copy(
+                pedido = p,
+                mesa = _state.value.mesas.find { it.idMesa == p.idMesa } ?: _state.value.mesa,
+                pagina = if (it.pagina == "Caja") "Caja" else "Comanda",
+                modoSoloLecturaAviso = if (propio) null else "Mesa atendida por ${p.codigoMozo} (${p.estado}). Vista de solo lectura.",
+                error = null
+            )
+        }
         val conservar = previo?.idPedido == p.idPedido && !previo.creacionIncierta && p.estado == "BORRADOR"
         persistir(Borrador(p.idMesa, if (conservar) previo!!.lineas else p.lineas,
             if (conservar) previo!!.observaciones else p.observaciones.orEmpty(), p.idPedido))
@@ -321,13 +446,21 @@ class PosViewModel(
 
     fun cambiarDisponibilidad(idProducto: Long, disponible: Boolean) = task {
         repo.cambiarDisponibilidad(idProducto, disponible)
-        if (_state.value.puedeMesas) cargarSalon()
-        _state.update { it.copy(mensaje = "Disponibilidad de plato actualizada") }
+        val prodActivos = if (_state.value.puedeMesas) runCatching { repo.productos() }.getOrNull() else null
+        val todos = runCatching { repo.todosProductos() }.getOrNull()
+        _state.update { s ->
+            s.copy(
+                productos = prodActivos ?: s.productos.filter { if (it.idProducto == idProducto) disponible else true },
+                productosTodos = todos ?: s.productosTodos.map { if (it.idProducto == idProducto) it.copy(disponible = disponible) else it },
+                mensaje = if (disponible) "Plato habilitado nuevamente en el menú" else "Plato marcado como agotado"
+            )
+        }
     }
 
     private suspend fun refrescarCocina() = kitchenLock.withLock {
         runCatching {
             val pedidos = repo.cocina()
+            val todos = runCatching { repo.todosProductos() }.getOrNull()
             val nuevosIds = pedidos.map { it.idPedido }.toSet()
             val entrantes = nuevosIds - idsCocina
             if (cocinaIniciada && entrantes.isNotEmpty() && entrantes.any { it !in idsNotificados }) {
@@ -340,7 +473,14 @@ class PosViewModel(
             }
             idsCocina = nuevosIds
             cocinaIniciada = true
-            _state.update { it.copy(cocina = pedidos, cocinaActualizada = Clock.System.now().toEpochMilliseconds(), cocinaAviso = null) }
+            _state.update {
+                it.copy(
+                    cocina = pedidos,
+                    productosTodos = todos ?: it.productosTodos,
+                    cocinaActualizada = Clock.System.now().toEpochMilliseconds(),
+                    cocinaAviso = null
+                )
+            }
         }.onFailure { e ->
             _state.update { it.copy(cocinaAviso = "KDS: ${e.message}") }
         }
@@ -371,6 +511,8 @@ class PosViewModel(
                         _state.update { it.copy(socketConectado = true, cocinaAviso = null) }
                         socket.eventos().collect {
                             refrescarCocina()
+                            if (_state.value.puedeMesas) cargarSalon()
+                            if (_state.value.puedeCaja) cargarCajaDatos()
                         }
                     }.onFailure { e ->
                         _state.update { it.copy(socketConectado = false, cocinaAviso = "KDS: ${e.message}") }
@@ -389,33 +531,40 @@ class PosViewModel(
     private suspend fun cargarTurnoCaja() {
         runCatching {
             val turno = repo.turnoAbierto()
-            if (turno != null && turno.estado == "ABIERTO") {
-                _state.update { it.copy(turnoCaja = turno) }
+            _state.update { it.copy(turnoCaja = if (turno != null && turno.estado == "ABIERTO") turno else null) }
+        }
+    }
+
+    private suspend fun cargarCajaDatos() {
+        cargarTurnoCaja()
+        runCatching {
+            val pendientes = repo.pendientesCobro()
+            _state.update { s ->
+                val actual = s.pedido
+                val actualizado = if (actual != null && s.pagina == "Caja") {
+                    pendientes.find { it.idPedido == actual.idPedido }
+                } else actual
+                s.copy(pendientesCobro = pendientes, pedido = actualizado)
             }
         }
     }
 
     fun abrirCaja(montoInicial: Double) = task {
-        val res = runCatching {
-            repo.aperturaCaja(montoInicial)
-        }.getOrElse {
-            val user = _state.value.sesion?.usuario?.nombreCompleto ?: "Cajero Wendy's"
-            TurnoCaja(
-                idTurno = 101L,
-                cajero = user,
-                montoInicialCentimos = (montoInicial * 100).toLong(),
-                fechaApertura = "2026-11-19 12:00:00",
-                estado = "ABIERTO"
-            )
-        }
-        val cent = res.montoInicialCentimos
-        val centStr = (cent % 100).toString().padStart(2, '0')
-        _state.update { it.copy(turnoCaja = res, mensaje = "Turno de caja #${res.idTurno} abierto con fondo de S/ ${cent / 100}.$centStr") }
+        require(montoInicial >= 0.0) { "El fondo inicial no puede ser negativo." }
+        val res = repo.aperturaCaja(montoInicial)
+        val centStr = dinero(res.montoInicialCentimos)
+        _state.update { it.copy(turnoCaja = res, cierreInfo = null, mensaje = "Turno de caja #${res.idTurno} abierto con fondo de $centStr") }
+        cargarCajaDatos()
     }
 
     private fun liberarMesaYLimpiarPedido(idPedido: Long, idMesaOpt: Long?) {
         val s = _state.value
-        val idMesa = idMesaOpt ?: s.pedido?.idMesa ?: s.mesa?.idMesa ?: s.cocina.find { it.idPedido == idPedido }?.idMesa
+        val idMesa = idMesaOpt
+            ?: s.pedido?.idMesa
+            ?: s.pendientesCobro.find { it.idPedido == idPedido }?.idMesa
+            ?: s.pedidosSalon.find { it.idPedido == idPedido }?.idMesa
+            ?: s.mesa?.idMesa
+            ?: s.cocina.find { it.idPedido == idPedido }?.idMesa
         val codigoTrabajador = s.sesion?.usuario?.codigoTrabajador
         val listaBorradores = if (codigoTrabajador != null) {
             val nuevaLista = s.borradores.filterNot { (idMesa != null && it.idMesa == idMesa) || it.idPedido == idPedido }
@@ -427,81 +576,138 @@ class PosViewModel(
             s.mesas.map { if (it.idMesa == idMesa) it.copy(estado = "LIBRE") else it }
         } else s.mesas
 
-        val cocinaFiltrada = s.cocina.filterNot { it.idPedido == idPedido }
-
         _state.update {
             it.copy(
                 pedido = null,
-                mesa = null,
+                mesa = if (it.mesa?.idMesa == idMesa) null else it.mesa,
                 borrador = if (it.borrador?.idMesa == idMesa || it.borrador?.idPedido == idPedido) null else it.borrador,
                 borradores = listaBorradores,
                 mesas = mesasActualizadas,
-                cocina = cocinaFiltrada
+                cocina = s.cocina.filterNot { p -> p.idPedido == idPedido },
+                pedidosSalon = s.pedidosSalon.filterNot { p -> p.idPedido == idPedido },
+                pendientesCobro = s.pendientesCobro.filterNot { p -> p.idPedido == idPedido }
             )
         }
     }
 
-    fun cobrarEfectivo(idPedido: Long, recibido: Double, total: Double, idMesaOpt: Long? = null) = task {
+    fun cobrarYEmitirComprobante(
+        idPedido: Long,
+        metodoPago: String,
+        recibidoEfectivo: Double = 0.0,
+        totalPedido: Double,
+        operacionDigital: String = "",
+        ultimos4Digital: String = "",
+        partesMixto: List<Triple<String, Double, String?>> = emptyList(),
+        idMesaOpt: Long? = null,
+        emitirSunat: Boolean = true,
+        tipoComprobante: String = "BOLETA",
+        tipoDoc: String = "Sin Doc",
+        numDoc: String = "",
+        razonSocial: String = "",
+        direccion: String = "",
+        correo: String? = null,
+        telefonoWhatsapp: String? = null,
+        enviarWhatsapp: Boolean = false
+    ) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
-        runCatching {
-            repo.cobrarEfectivo(idPedido, t.idTurno, recibido, total)
+        val idMesa = idMesaOpt
+            ?: _state.value.pedido?.idMesa
+            ?: _state.value.pendientesCobro.find { it.idPedido == idPedido }?.idMesa
+            ?: _state.value.mesa?.idMesa
+
+        val met = metodoPago.uppercase()
+        val pago = when (met) {
+            "EFECTIVO" -> repo.cobrarEfectivo(idPedido, t.idTurno, recibidoEfectivo, totalPedido)
+            "MIXTO" -> repo.cobrarMixto(idPedido, t.idTurno, partesMixto)
+            else -> repo.cobrarDigital(idPedido, t.idTurno, met, totalPedido, operacionDigital, ultimos4Digital)
         }
-        val vueltoCent = ((recibido - total) * 100).toLong().coerceAtLeast(0L)
-        val vueltoStr = "S/ ${vueltoCent / 100}.${(vueltoCent % 100).toString().padStart(2, '0')}"
+
         liberarMesaYLimpiarPedido(idPedido, idMesa)
-        _state.update { it.copy(mensaje = "Cobro en efectivo registrado con éxito. Vuelto a entregar: $vueltoStr") }
-        cargarTurnoCaja()
-        delay(1200)
+
+        val vueltoCent = if (met == "EFECTIVO") {
+            if (pago.vueltoCentimos > 0L) pago.vueltoCentimos
+            else ((recibidoEfectivo - totalPedido) * 100.0 + 0.5).toLong().coerceAtLeast(0L)
+        } else 0L
+        val vueltoStr = dinero(vueltoCent)
+
+        var comprobante: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat? = null
+        var avisoExtra = ""
+
+        if (emitirSunat) {
+            val nomClean = razonSocial.trim()
+            val numClean = numDoc.trim()
+            val dirClean = direccion.trim()
+            val tipoComp = tipoComprobante.trim().uppercase()
+            val modalidad = when {
+                tipoComp == "FACTURA" && nomClean.isNotBlank() -> "MANUAL"
+                tipoComp == "FACTURA" -> "RUC"
+                tipoDoc == "Sin Doc" || (numClean.isBlank() && nomClean.isBlank()) -> "SIN_DATOS"
+                nomClean.isNotBlank() -> "MANUAL"
+                tipoDoc.equals("DNI", ignoreCase = true) -> "DNI"
+                tipoDoc.equals("RUC", ignoreCase = true) -> "RUC"
+                else -> "MANUAL"
+            }
+            val tipoDocFinal = when (modalidad) {
+                "SIN_DATOS" -> null
+                "DNI" -> "DNI"
+                "RUC" -> "RUC"
+                else -> if (tipoDoc == "Sin Doc" || numClean.isBlank()) null else tipoDoc.uppercase()
+            }
+            val reqComp = pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante(
+                idPedido = idPedido,
+                idPago = pago.idPago,
+                modalidad = modalidad,
+                tipoComprobante = tipoComp,
+                tipoDocumento = tipoDocFinal,
+                numeroDocumento = numClean.ifBlank { null },
+                nombreCompleto = nomClean.ifBlank { null },
+                direccion = dirClean.ifBlank { null },
+                correo = correo?.trim()?.ifBlank { null },
+                telefono = telefonoWhatsapp?.trim()?.ifBlank { null }
+            )
+            runCatching { repo.emitirComprobanteSunat(reqComp) }
+                .onSuccess { comprobante = it }
+                .onFailure { avisoExtra += " · SUNAT: ${it.message}" }
+        }
+
+        if (enviarWhatsapp && !telefonoWhatsapp.isNullOrBlank()) {
+            runCatching { repo.ticketWhatsApp(idPedido, telefonoWhatsapp.trim(), t.idTurno) }
+                .onSuccess { avisoExtra += " · Ticket enviado a WhatsApp" }
+                .onFailure { avisoExtra += " · WhatsApp: ${it.message}" }
+        }
+
+        val resumenCobro = when (met) {
+            "EFECTIVO" -> "Cobro en efectivo registrado (#${pago.idPago}). Vuelto: $vueltoStr"
+            "MIXTO" -> "Cobro mixto registrado (#${pago.idPago}) con éxito"
+            else -> "Cobro $met registrado (#${pago.idPago}) con éxito"
+        }
+
+        _state.update {
+            it.copy(
+                comprobanteEmitido = comprobante,
+                transaccionTarjeta = null,
+                clienteSeleccionado = null,
+                mensaje = "$resumenCobro$avisoExtra"
+            )
+        }
+
+        delay(800)
+        cargarCajaDatos()
         if (_state.value.puedeMesas) cargarSalon()
     }
 
-    fun cobrarDigital(idPedido: Long, metodo: String, total: Double, operacion: String, ultimos4: String, idMesaOpt: Long? = null) = task {
-        val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
-        runCatching {
-            repo.cobrarDigital(idPedido, t.idTurno, metodo, total, operacion, ultimos4)
-        }
-        liberarMesaYLimpiarPedido(idPedido, idMesa)
-        _state.update { it.copy(mensaje = "Cobro digital ($metodo - Op: $operacion) registrado con éxito") }
-        cargarTurnoCaja()
-        delay(1200)
-        if (_state.value.puedeMesas) cargarSalon()
-    }
+    fun cobrarEfectivo(idPedido: Long, recibido: Double, total: Double, idMesaOpt: Long? = null) =
+        cobrarYEmitirComprobante(idPedido, "EFECTIVO", recibido, total, idMesaOpt = idMesaOpt, emitirSunat = false)
 
-    fun cobrarMixto(idPedido: Long, partes: List<Triple<String, Double, String?>>, idMesaOpt: Long? = null) = task {
-        val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
-        runCatching {
-            repo.cobrarMixto(idPedido, t.idTurno, partes)
-        }
-        val detalle = partes.joinToString(" + ") { (met, monto, _) ->
-            val cent = (monto * 100).toLong()
-            "$met: S/ ${cent / 100}.${(cent % 100).toString().padStart(2, '0')}"
-        }
-        liberarMesaYLimpiarPedido(idPedido, idMesa)
-        _state.update { it.copy(mensaje = "Cobro mixto ($detalle) registrado con éxito") }
-        cargarTurnoCaja()
-        delay(1200)
-        if (_state.value.puedeMesas) cargarSalon()
-    }
+    fun cobrarDigital(idPedido: Long, metodo: String, total: Double, operacion: String, ultimos4: String, idMesaOpt: Long? = null) =
+        cobrarYEmitirComprobante(idPedido, metodo, totalPedido = total, operacionDigital = operacion, ultimos4Digital = ultimos4, idMesaOpt = idMesaOpt, emitirSunat = false)
+
+    fun cobrarMixto(idPedido: Long, partes: List<Triple<String, Double, String?>>, idMesaOpt: Long? = null) =
+        cobrarYEmitirComprobante(idPedido, "MIXTO", totalPedido = partes.sumOf { it.second }, partesMixto = partes, idMesaOpt = idMesaOpt, emitirSunat = false)
 
     fun cerrarCaja(efectivoReal: Double, motivo: String) = task {
         val t = _state.value.turnoCaja ?: error("No hay turno abierto para cerrar.")
-        val res = runCatching {
-            repo.cierreCaja(t.idTurno, efectivoReal, motivo)
-        }.getOrElse {
-            val esperadoCent = t.montoInicialCentimos + 15500L
-            val realCent = (efectivoReal * 100).toLong()
-            CierreCajaInfo(
-                idTurno = t.idTurno,
-                montoInicialCentimos = t.montoInicialCentimos,
-                totalEfectivoEsperadoCentimos = esperadoCent,
-                totalEfectivoRealCentimos = realCent,
-                diferenciaCentimos = realCent - esperadoCent,
-                fechaCierre = "2026-11-19 23:00:00"
-            )
-        }
+        val res = repo.cierreCaja(t.idTurno, efectivoReal, motivo.ifBlank { "CIERRE NORMAL" })
         _state.update { it.copy(turnoCaja = null, cierreInfo = res, mensaje = "Turno de caja #${t.idTurno} cerrado exitosamente con arqueo.") }
     }
 
@@ -513,19 +719,24 @@ class PosViewModel(
         titular: String,
         monto: Double
     ) = task {
+        val mesInt = mes.trim().toIntOrNull() ?: throw IllegalArgumentException("Mes de vencimiento inválido (1-12).")
+        val anioRaw = anio.trim().toIntOrNull() ?: throw IllegalArgumentException("Año de vencimiento inválido.")
+        val anioInt = if (anioRaw in 0..99) 2000 + anioRaw else anioRaw
         val req = pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudSimularTarjeta(
             numeroTarjeta = numeroTarjeta.replace(" ", "").replace("-", ""),
-            mesExpiracion = mes.trim(),
-            anioExpiracion = anio.trim(),
+            mesVencimiento = mesInt,
+            anioVencimiento = anioInt,
             cvv = cvv.trim(),
-            titular = titular.trim().uppercase(),
-            monto = monto
+            titular = titular.trim().uppercase()
         )
         val res = repo.simularTarjeta(req)
+        if (!res.aprobadaFinal) {
+            throw FalloApi(400, res.mensaje.ifBlank { "Transacción con tarjeta rechazada." })
+        }
         _state.update {
             it.copy(
                 transaccionTarjeta = res,
-                mensaje = "Tarjeta ${res.marcaTarjeta} aprobada (Autorización: ${res.codigoAutorizacion})"
+                mensaje = "Tarjeta ${res.marcaFinal} aprobada (Voucher: ${res.numeroOperacionFinal})"
             )
         }
     }
@@ -536,28 +747,42 @@ class PosViewModel(
 
     fun emitirComprobanteSunat(
         idPedido: Long,
+        idPago: Long,
         tipoComprobante: String,
         tipoDoc: String,
         numDoc: String,
         razonSocial: String,
+        direccion: String = "",
         correo: String? = null
     ) = task {
-        val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
+        val nomClean = razonSocial.trim()
+        val numClean = numDoc.trim()
+        val tipoComp = tipoComprobante.trim().uppercase()
+        val modalidad = when {
+            tipoComp == "FACTURA" && nomClean.isNotBlank() -> "MANUAL"
+            tipoComp == "FACTURA" -> "RUC"
+            tipoDoc == "Sin Doc" || (numClean.isBlank() && nomClean.isBlank()) -> "SIN_DATOS"
+            nomClean.isNotBlank() -> "MANUAL"
+            tipoDoc.equals("DNI", ignoreCase = true) -> "DNI"
+            tipoDoc.equals("RUC", ignoreCase = true) -> "RUC"
+            else -> "MANUAL"
+        }
         val req = pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante(
             idPedido = idPedido,
-            idTurnoCaja = t.idTurno,
-            tipoComprobante = tipoComprobante,
-            serie = if (tipoComprobante == "FACTURA") "F001" else "B001",
-            tipoDocumentoCliente = if (tipoDoc == "Sin Doc") "SIN_DOCUMENTO" else tipoDoc,
-            numeroDocumentoCliente = if (tipoDoc == "Sin Doc") "00000000" else numDoc.ifBlank { "00000000" },
-            razonSocialCliente = if (tipoDoc == "Sin Doc") "CLIENTES VARIOS" else razonSocial.ifBlank { "CLIENTE GENERAL" },
-            correoEnvio = correo
+            idPago = idPago,
+            modalidad = modalidad,
+            tipoComprobante = tipoComp,
+            tipoDocumento = if (modalidad == "SIN_DATOS" || numClean.isBlank()) null else tipoDoc.uppercase(),
+            numeroDocumento = numClean.ifBlank { null },
+            nombreCompleto = nomClean.ifBlank { null },
+            direccion = direccion.trim().ifBlank { null },
+            correo = correo?.trim()?.ifBlank { null }
         )
         val res = repo.emitirComprobanteSunat(req)
         _state.update {
             it.copy(
                 comprobanteEmitido = res,
-                mensaje = "Comprobante ${res.numeroComprobante} emitido y aprobado por SUNAT Beta"
+                mensaje = "Comprobante ${res.numeroFinal} emitido y aprobado por SUNAT Beta"
             )
         }
     }
@@ -578,34 +803,37 @@ class PosViewModel(
     }
 
     fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String) = task {
-        runCatching {
-            repo.aplicarDescuento(idPedido, porcentaje, motivo)
-        }
+        require(porcentaje > 0.0 && porcentaje < 100.0) { "Ingresa un porcentaje válido mayor a 0 y menor a 100." }
+        require(motivo.isNotBlank()) { "Indica el motivo del descuento para auditoría." }
+        repo.aplicarDescuento(idPedido, porcentaje, motivo.trim())
+        val actualizado = runCatching { repo.pedidoPendienteCobro(idPedido) }.getOrNull()
         _state.update { s ->
-            val pActual = s.pedido
-            if (pActual != null && pActual.idPedido == idPedido) {
-                val factor = (100.0 - porcentaje).coerceAtLeast(0.0) / 100.0
-                val nuevoImporteCent = (pActual.importeCentimos * factor).toLong()
-                val descCent = pActual.importeCentimos - nuevoImporteCent
-                s.copy(
-                    pedido = pActual.copy(
-                        importeCentimos = nuevoImporteCent,
-                        descuentoCentimos = descCent,
-                        porcentajeDescuento = porcentaje,
-                        observaciones = motivo.ifBlank { pActual.observaciones }
-                    ),
-                    mensaje = "Descuento del ${porcentaje.toInt()}% aplicado correctamente"
+            val fallbackActual = s.pedido?.takeIf { it.idPedido == idPedido }?.let { p ->
+                val nuevoCent = ((p.importeCentimos * ((100.0 - porcentaje) / 100.0)) + 0.5).toLong()
+                p.copy(
+                    importeCentimos = nuevoCent,
+                    descuentoCentimos = p.importeCentimos - nuevoCent,
+                    porcentajeDescuento = porcentaje,
+                    observaciones = motivo.trim()
                 )
-            } else {
-                s.copy(mensaje = "Descuento del ${porcentaje.toInt()}% aplicado")
             }
+            val resPedido = actualizado ?: fallbackActual
+            s.copy(
+                pedido = resPedido,
+                pendientesCobro = s.pendientesCobro.map { if (it.idPedido == idPedido && resPedido != null) resPedido else it },
+                mensaje = "Descuento del ${porcentaje.toInt()}% aplicado correctamente"
+            )
         }
+        cargarCajaDatos()
     }
 
     fun anularPedido(idPedido: Long, motivo: String) = task {
-        repo.anularPedido(idPedido, motivo)
+        require(motivo.isNotBlank()) { "Debes ingresar el motivo de anulación." }
+        repo.anularPedido(idPedido, motivo.trim())
+        liberarMesaYLimpiarPedido(idPedido, null)
         _state.update { it.copy(mensaje = "Pedido anulado correctamente") }
         if (_state.value.puedeMesas) cargarSalon()
+        if (_state.value.puedeCaja) cargarCajaDatos()
     }
 
     // --- INVENTARIO Y ALMACÉN (SPRINT 3) ---
@@ -643,7 +871,8 @@ class PosViewModel(
             val ventas = repo.reporteVentasPorHora()
             val platos = repo.reportePlatosPopulares()
             val auditoria = repo.auditoriaPedidos()
-            _state.update { it.copy(ventasPorHora = ventas, platosPopulares = platos, auditoria = auditoria) }
+            val usuarios = runCatching { repo.usuarios() }.getOrDefault(_state.value.usuarios)
+            _state.update { it.copy(ventasPorHora = ventas, platosPopulares = platos, auditoria = auditoria, usuarios = usuarios) }
         }.onFailure { e ->
             _state.update { it.copy(error = "Reportes: ${e.message}") }
         }

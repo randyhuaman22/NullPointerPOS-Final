@@ -20,10 +20,14 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun mesas() = api.mesas()
     override suspend fun categorias() = api.categorias()
     override suspend fun productos() = api.productos().map { it.dominio() }
+    override suspend fun todosProductos() = api.todosProductos().map { it.dominio() }
     override suspend fun crear(b: Borrador) =
         api.crear(CrearPedidoRequest(b.idMesa, b.observaciones, b.lineas.map { it.request() })).dominio()
 
     override suspend fun pedido(id: Long) = api.pedido(id).dominio()
+    override suspend fun pedidosActivosSalon() = api.pedidosActivosSalon().map { it.dominio() }
+    override suspend fun pendientesCobro() = api.pendientesCobro().map { it.dominio() }
+    override suspend fun pedidoPendienteCobro(idPedido: Long) = api.pedidoPendienteCobro(idPedido).dominio()
     override suspend fun editar(id: Long, lineas: List<Linea>) =
         api.editar(id, EditarPedidoRequest(lineas.map { it.request() })).dominio()
 
@@ -51,115 +55,53 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
 
     override suspend fun resumenPago(idPedido: Long) = api.resumenPago(idPedido)
 
-    override suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double) {
+    override suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double): CobroResultado {
         val idem = nuevaIdempotencia()
-        api.cobrarEfectivo(CobroEfectivoRequest(idPedido, recibido, idem, idTurno, total, idem))
+        return api.cobrarEfectivo(CobroEfectivoRequest(idPedido, recibido, idem, idTurno, total, idem)).dominio()
     }
 
-    override suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String) {
+    override suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String): CobroResultado {
         val idem = nuevaIdempotencia()
         val met = metodo.uppercase()
-        val op = operacion.ifBlank { "849201" }
+        val op = operacion.trim()
+        require(op.isNotBlank()) { "Ingresa el número de operación o voucher." }
         val u4 = ultimos4.ifBlank { "0000" }.takeLast(4).padStart(4, '0')
-        api.cobrarDigital(CobroDigitalRequest(idPedido, met, op, u4, idem, met, idTurno, total, idem))
+        return api.cobrarDigital(CobroDigitalRequest(idPedido, met, op, u4, idem, met, idTurno, total, idem)).dominio()
     }
 
-    override suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>) {
+    override suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>): CobroResultado {
         val idem = nuevaIdempotencia()
         val partesDto = partes.map { (metodo, imp, op) ->
             val met = metodo.uppercase()
-            val u4 = if (met.equals("EFECTIVO", ignoreCase = true)) "" else (op?.takeLast(4)?.padStart(4, '0') ?: "0000")
-            PartePagoDto(met, imp, op, u4, met)
+            val u4 = if (met.equals("EFECTIVO", ignoreCase = true)) null else (op?.takeLast(4)?.padStart(4, '0') ?: "0000")
+            PartePagoDto(met, imp, op?.takeIf { it.isNotBlank() }, u4, met)
         }
-        api.cobrarMixto(CobroMixtoRequest(idPedido, idem, partesDto, idTurno, idem))
+        return api.cobrarMixto(CobroMixtoRequest(idPedido, idem, partesDto, idTurno, idem)).dominio()
     }
 
     override suspend fun cierreCaja(idTurno: Long, efectivoReal: Double, motivo: String) =
         api.cierreCaja(CierreCajaRequest(efectivoReal, motivo, idTurno, efectivoReal, motivo)).dominio()
 
     override suspend fun simularTarjeta(solicitud: SolicitudSimularTarjeta): RespuestaSimuladorTarjeta {
-        return runCatching {
-            api.simularTarjeta(solicitud)
-        }.getOrElse {
-            val limpia = solicitud.numeroTarjeta.replace(" ", "").replace("-", "")
-            val ultimos4 = if (limpia.length >= 4) limpia.takeLast(4) else "0366"
-            val marca = when {
-                limpia.startsWith("4") -> "VISA"
-                limpia.startsWith("5") -> "MASTERCARD"
-                limpia.startsWith("3") -> "AMEX"
-                else -> "TARJETA"
-            }
-            RespuestaSimuladorTarjeta(
-                aprobado = true,
-                codigoAutorizacion = "AUTH-${Random.nextInt(100000, 999999)}",
-                mensaje = "Transacción aprobada en simulador POS",
-                ultimosCuatroDigitos = ultimos4,
-                marcaTarjeta = marca,
-                referencia = "VOUCH-${Clock_now()}"
-            )
-        }
+        return api.simularTarjeta(solicitud)
     }
 
     override suspend fun emitirComprobanteSunat(solicitud: SolicitudEmitirComprobante): RespuestaComprobanteSunat {
-        return runCatching {
-            api.emitirComprobanteSunat(solicitud)
-        }.getOrElse {
-            val serie = solicitud.serie ?: if (solicitud.tipoComprobante == "FACTURA") "F001" else "B001"
-            val num = Random.nextLong(1000, 9999)
-            val numComp = "$serie-${num.toString().padStart(8, '0')}"
-            val total = 65.00
-            val gravado = 55.08
-            val igv = 9.92
-            val hash = "a8f3b9c2d1e045ab78cd"
-            val rucEmisor = "20609123456"
-            val tipoCompCode = if (solicitud.tipoComprobante == "FACTURA") "01" else "03"
-            val tipoDocCli = if (solicitud.tipoDocumentoCliente == "RUC") "6" else "1"
-            val qrString = "$rucEmisor|$tipoCompCode|$serie|${num.toString().padStart(8, '0')}|$igv|$total|2026-11-25|$tipoDocCli|${solicitud.numeroDocumentoCliente}|$hash|"
-            RespuestaComprobanteSunat(
-                idComprobante = num,
-                tipoComprobante = solicitud.tipoComprobante,
-                serie = serie,
-                numero = num,
-                numeroComprobante = numComp,
-                estadoSunat = "ACEPTADO",
-                descripcionSunat = "La ${if (solicitud.tipoComprobante == "FACTURA") "Factura" else "Boleta"} número $numComp ha sido aceptada por SUNAT Beta",
-                codigoHash = hash,
-                codigoQr = qrString,
-                totalGravado = gravado,
-                totalIgv = igv,
-                totalImporte = total,
-                fechaEmision = "2026-11-25 14:30:00",
-                urlPdf = "/api/v1/comprobantes/$num/pdf",
-                urlXml = "/api/v1/comprobantes/$num/xml"
-            )
-        }
+        return api.emitirComprobanteSunat(solicitud)
     }
 
     // --- SPRINT 3 ---
     override suspend fun buscarCliente(tipo: String, numero: String): ClienteDoc? {
-        val res = runCatching { api.buscarCliente(tipo, numero) }.getOrNull()
-        if (res != null) {
-            return ClienteDoc(res.tipoDocumento, res.numeroDocumento, res.razonSocialFinal, res.direccion)
-        }
-        val num = numero.trim()
-        val t = tipo.trim().uppercase()
-        return when {
-            t == "DNI" && (num == "12345678" || num.length == 8) -> {
-                ClienteDoc("DNI", num, if (num == "12345678") "CLIENTE DE PRUEBA" else "CLIENTE $num", "LIMA, PERÚ")
-            }
-            t == "RUC" && (num == "20123456789" || num.length == 11) -> {
-                ClienteDoc("RUC", num, if (num == "20123456789") "EMPRESA DEMOSTRATIVA S.A.C." else "EMPRESA $num S.A.C.", "AV. JAVIER PRADO 1234, LIMA")
-            }
-            else -> null
-        }
+        val res = runCatching { api.buscarCliente(tipo.trim().uppercase(), numero.trim()) }.getOrNull() ?: return null
+        return ClienteDoc(res.tipoDocumento, res.numeroDocumento, res.razonSocialFinal, res.direccion)
     }
 
     override suspend fun guardarCliente(cliente: ClienteDoc) {
-        api.guardarCliente(ClienteDto(cliente.tipoDocumento, cliente.numeroDocumento, cliente.razonSocial, cliente.direccion))
+        api.guardarCliente(ClienteDto(cliente.tipoDocumento, cliente.numeroDocumento, cliente.razonSocial, cliente.razonSocial, cliente.direccion))
     }
 
     override suspend fun ticketWhatsApp(idPedido: Long, telefono: String, idTurno: Long) {
-        api.ticketWhatsApp(TicketWhatsAppRequest(idPedido, telefono, idTurno))
+        api.ticketWhatsApp(TicketWhatsAppRequest(idPedido, telefono))
     }
 
     override suspend fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String) {
@@ -179,16 +121,17 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun alertasStock() = api.alertasStock().map { it.dominio() }
 
     override suspend fun guardarReceta(idProducto: Long, ingredientes: List<Ingrediente>) {
-        val dtos = ingredientes.map { IngredienteRecetaDto(it.idInsumo, it.cantidadRequerida, it.unidadMedida) }
-        api.guardarReceta(idProducto, RecetaRequest(idProducto, dtos))
+        val dtos = ingredientes.map { IngredienteRecetaDto(it.idInsumo, it.cantidadRequerida) }
+        api.guardarReceta(idProducto, dtos)
     }
 
     override suspend fun registrarCompra(proveedor: String, doc: String, items: List<ItemCompraDto>, obs: String) {
-        api.registrarCompra(CompraRequest(proveedor, doc, items, obs))
+        api.registrarCompra(CompraRequest(proveedor, doc, obs.ifBlank { null }, items))
     }
 
     override suspend fun registrarMerma(idInsumo: Long, cantidad: Double, motivo: String, obs: String) {
-        api.registrarMerma(MermaRequest(idInsumo, cantidad, motivo, obs))
+        val mot = if (obs.isBlank()) motivo else "$motivo ($obs)"
+        api.registrarMerma(MermaRequest(idInsumo, cantidad, mot))
     }
 
     override suspend fun reporteVentasPorHora() = api.reporteVentasPorHora().map { it.dominio() }

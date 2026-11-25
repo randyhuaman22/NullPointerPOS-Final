@@ -17,10 +17,13 @@ data class PosUiState(
     val mesas: List<Mesa> = emptyList(),
     val categorias: List<Categoria> = emptyList(),
     val productos: List<Producto> = emptyList(),
+    val productosTodos: List<Producto> = emptyList(),
+    val pedidosSalon: List<Pedido> = emptyList(),
     val borradores: List<Borrador> = emptyList(),
     val mesa: Mesa? = null,
     val borrador: Borrador? = null,
     val pedido: Pedido? = null,
+    val modoSoloLecturaAviso: String? = null,
 
     // Cocina KDS
     val cocina: List<Pedido> = emptyList(),
@@ -30,6 +33,7 @@ data class PosUiState(
     val nuevoPedidoCocinaAviso: Pedido? = null,
 
     // Caja y Cobros (Sprint 2 y 3)
+    val pendientesCobro: List<Pedido> = emptyList(),
     val turnoCaja: TurnoCaja? = null,
     val cierreInfo: CierreCajaInfo? = null,
     val clienteSeleccionado: ClienteDoc? = null,
@@ -55,5 +59,9 @@ data class PosUiState(
     val puedeAdmin get() = rol == "ADMINISTRADOR"
 
     val editable get() = borrador != null && (pedido == null || pedido.estado == "BORRADOR") &&
-            !borrador.creacionIncierta && (mesa?.estado == "LIBRE" || borrador.idPedido != null)
+            !borrador.creacionIncierta &&
+            (pedido == null ||
+                sesion?.usuario?.rol?.uppercase() == "ADMINISTRADOR" ||
+                pedido.codigoMozo.equals(sesion?.usuario?.codigoTrabajador, ignoreCase = true)) &&
+            (mesa?.estado == "LIBRE" || borrador.idPedido != null)
 }

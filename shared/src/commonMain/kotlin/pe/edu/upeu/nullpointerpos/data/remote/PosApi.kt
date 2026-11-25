@@ -43,7 +43,6 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
                 is DescuentoPedidoRequest -> setBody(payload)
                 is AnularPedidoRequest -> setBody(payload)
                 is CrearInsumoRequest -> setBody(payload)
-                is RecetaRequest -> setBody(payload)
                 is CompraRequest -> setBody(payload)
                 is MermaRequest -> setBody(payload)
                 is SolicitudSimularTarjeta -> setBody(payload)
@@ -68,9 +67,12 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
     suspend fun mesas(): List<Mesa> = call("mesas").body()
     suspend fun categorias(): List<Categoria> = call("menu/categorias").body()
     suspend fun productos(): List<ProductoDto> = call("menu/productos?soloDisponibles=true").body()
-    suspend fun todosProductos(): List<ProductoDto> = call("menu/productos").body()
+    suspend fun todosProductos(): List<ProductoDto> = call("menu/productos?soloDisponibles=false").body()
     suspend fun crear(b: CrearPedidoRequest): PedidoDto = call("pedidos", HttpMethod.Post, b).body()
     suspend fun pedido(id: Long): PedidoDto = call("pedidos/$id").body()
+    suspend fun pedidosActivosSalon(): List<PedidoDto> = call("pedidos/salon-activos").body()
+    suspend fun pendientesCobro(): List<PedidoDto> = call("pedidos/pendientes-cobro").body()
+    suspend fun pedidoPendienteCobro(idPedido: Long): PedidoDto = call("pedidos/pendientes-cobro/$idPedido").body()
     suspend fun editar(id: Long, b: EditarPedidoRequest): PedidoDto = call("pedidos/$id/detalles", HttpMethod.Put, b).body()
     suspend fun enviar(id: Long): EnvioResponse = call("pedidos/$id/enviar-cocina", HttpMethod.Post).body()
     suspend fun trasladar(b: TrasladoRequest) { call("mesas/trasladar", HttpMethod.Put, b) }
@@ -99,17 +101,14 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
         return runCatching { call("caja/turno-abierto").body<TurnoCajaResponse>() }.getOrNull()
     }
 
-    suspend fun cobrarEfectivo(b: CobroEfectivoRequest) {
-        call("caja/cobrar", HttpMethod.Post, b)
-    }
+    suspend fun cobrarEfectivo(b: CobroEfectivoRequest): RespuestaPagoDto =
+        call("caja/cobrar", HttpMethod.Post, b).body()
 
-    suspend fun cobrarDigital(b: CobroDigitalRequest) {
-        call("caja/cobrar-digital", HttpMethod.Post, b)
-    }
+    suspend fun cobrarDigital(b: CobroDigitalRequest): RespuestaPagoDto =
+        call("caja/cobrar-digital", HttpMethod.Post, b).body()
 
-    suspend fun cobrarMixto(b: CobroMixtoRequest) {
-        call("caja/cobrar-mixto", HttpMethod.Post, b)
-    }
+    suspend fun cobrarMixto(b: CobroMixtoRequest): RespuestaPagoDto =
+        call("caja/cobrar-mixto", HttpMethod.Post, b).body()
 
     suspend fun cierreCaja(b: CierreCajaRequest): CierreCajaResponse =
         call("caja/cierre", HttpMethod.Post, b).body()
@@ -145,8 +144,8 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
     suspend fun insumos(): List<InsumoDto> = call("inventario/insumos").body()
     suspend fun crearInsumo(b: CrearInsumoRequest) { call("inventario/insumos", HttpMethod.Post, b) }
     suspend fun alertasStock(): List<InsumoDto> = call("inventario/alertas").body()
-    suspend fun guardarReceta(idProducto: Long, b: RecetaRequest) {
-        call("inventario/recetas/$idProducto", HttpMethod.Put, b)
+    suspend fun guardarReceta(idProducto: Long, ingredientes: List<IngredienteRecetaDto>) {
+        call("inventario/recetas/$idProducto", HttpMethod.Put, ingredientes)
     }
     suspend fun registrarCompra(b: CompraRequest) { call("inventario/compras", HttpMethod.Post, b) }
     suspend fun registrarMerma(b: MermaRequest) { call("inventario/mermas", HttpMethod.Post, b) }

@@ -59,4 +59,25 @@ class ContratoApiTest {
             assertEquals("Sin crema",pedido.lineas.single().observaciones)
         } finally { client.close() }
     }
+    @Test fun contratosSunatTarjetaYAuditoriaAlineadosConBackend() = runTest {
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val compJson = """{"idComprobante":1,"idPedido":9,"idPago":4,"tipoComprobante":"BOLETA","serie":"B001","correlativo":1,"numeroCompleto":"B001-00000001","fechaEmision":"2026-11-25T07:50:00Z","denominacionReceptor":"CLIENTE DE PRUEBA","totalGravado":55.08,"totalIgv":9.92,"totalImporte":65.00,"hashCpe":"abcd1234efgh","estadoSunat":"ACEPTADO","descripcionCdr":"Aceptado SUNAT","cadenaQr":"20609123456|03|B001|00000001|9.92|65.00|2026-11-25|1|12345678|abcd|"}"""
+        val comp = jsonParser.decodeFromString<RespuestaComprobanteSunat>(compJson)
+        assertEquals("B001-00000001", comp.numeroFinal)
+        assertEquals("abcd1234efgh", comp.hashFinal)
+        assertEquals("CLIENTE DE PRUEBA", comp.receptorFinal)
+
+        val tarjetaJson = """{"aprobado":true,"marca":"VISA","codigoAutorizacion":"AUTH-1122","numeroOperacion":"VOUCH-9988","ultimosCuatroDigitos":"0366","titular":"RANDY HUAMAN","mensaje":"Aprobado"}"""
+        val tarjeta = jsonParser.decodeFromString<RespuestaSimuladorTarjeta>(tarjetaJson)
+        assertTrue(tarjeta.aprobadaFinal)
+        assertEquals("VISA", tarjeta.marcaFinal)
+        assertEquals("VOUCH-9988", tarjeta.numeroOperacionFinal)
+        assertEquals("0366", tarjeta.ultimos4Final)
+
+        val audJson = """{"id_registro_auditoria":5,"id_usuario_actor":1,"accion":"MESA_BLOQUEADA","nombre_entidad":"MESA","id_entidad":"M01","motivo":null,"fecha_creacion":"2026-11-25T07:50:00Z"}"""
+        val aud = jsonParser.decodeFromString<AuditoriaPedidoDto>(audJson).dominio()
+        assertEquals("MESA", aud.nombreEntidad)
+        assertEquals("", aud.motivo)
+        assertEquals("1", aud.usuario)
+    }
 }

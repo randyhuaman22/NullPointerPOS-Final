@@ -69,7 +69,13 @@ data class Pedido(
     val lineas: List<Linea>,
     val observaciones: String? = null,
     val descuentoCentimos: Long = 0L,
-    val porcentajeDescuento: Double = 0.0
+    val porcentajeDescuento: Double = 0.0,
+    val fechaCreacion: String? = null,
+    val fechaPago: String? = null,
+    val segundosTranscurridos: Long? = null,
+    val minutosTranscurridos: Long? = null,
+    val nivelDemora: String? = null,
+    val siguienteUmbralMinutos: Int? = null
 ) {
     val descuentoPorcentaje: Double get() = porcentajeDescuento
     val descuentoMotivo: String? get() = observaciones
@@ -126,6 +132,17 @@ data class CierreCajaInfo(
     val totalEfectivoRealCentimos: Long,
     val diferenciaCentimos: Long,
     val fechaCierre: String
+)
+
+@Serializable
+data class CobroResultado(
+    val idPago: Long,
+    val idPedido: Long,
+    val metodo: String,
+    val importeCentimos: Long,
+    val importeRecibidoCentimos: Long,
+    val vueltoCentimos: Long,
+    val estado: String
 )
 
 // Modelos de Inventario (Sprint 3)
@@ -186,10 +203,18 @@ data class AuditoriaRegistro(
     val accion: String,
     val usuario: String,
     val motivo: String,
-    val fechaHora: String
+    val fechaHora: String,
+    val nombreEntidad: String = "PEDIDO"
 ) {
     val fecha: String get() = fechaHora
-    val codigoPedido: String get() = "PED-$idPedido"
+    val codigoPedido: String
+        get() = if (nombreEntidad.equals("PEDIDO", ignoreCase = true) && idPedido > 0) {
+            "PED-$idPedido"
+        } else if (idPedido > 0) {
+            "$nombreEntidad #$idPedido"
+        } else {
+            nombreEntidad
+        }
 }
 
 fun dinero(centimos: Long): String = "S/ ${centimos / 100}.${(centimos % 100).toString().padStart(2, '0')}"

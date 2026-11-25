@@ -7,9 +7,19 @@ import pe.edu.upeu.nullpointerpos.domain.model.*
 import pe.edu.upeu.nullpointerpos.data.remote.dto.*
 
 fun centimos(decimal: String): Long {
-    val normal = decimal.trim()
-    val num = normal.toDoubleOrNull() ?: 0.0
-    return (num * 100.0 + 0.5).toLong()
+    val s = decimal.trim()
+    val neg = s.startsWith("-")
+    val clean = if (neg) s.substring(1) else s
+    if (!Regex("^\\d+(\\.\\d+)?$").matches(clean)) throw IllegalArgumentException("Importe decimal inválido: $decimal")
+    val parts = clean.split('.')
+    val ent = parts[0].toLongOrNull() ?: throw IllegalArgumentException("Importe decimal inválido: $decimal")
+    val fracRaw = if (parts.size > 1) parts[1] else ""
+    if (fracRaw.length > 2 && fracRaw.substring(2).any { it != '0' }) {
+        throw IllegalArgumentException("Más de 2 decimales en importe: $decimal")
+    }
+    val frac = fracRaw.take(2).padEnd(2, '0').toLong()
+    val total = ent * 100L + frac
+    return if (neg) -total else total
 }
 
 fun ProductoDto.dominio() = Producto(
@@ -43,8 +53,24 @@ fun PedidoDto.dominio() = Pedido(
         )
     },
     observaciones = observaciones,
-    descuentoCentimos = descuentoTotal?.let { centimos(it.content) } ?: 0L,
-    porcentajeDescuento = porcentajeDescuento ?: 0.0
+    descuentoCentimos = (totalDescuento ?: descuentoTotal)?.let { centimos(it.content) } ?: 0L,
+    porcentajeDescuento = porcentajeDescuento ?: 0.0,
+    fechaCreacion = fechaCreacion,
+    fechaPago = fechaPago,
+    segundosTranscurridos = segundosTranscurridos,
+    minutosTranscurridos = minutosTranscurridos,
+    nivelDemora = nivelDemora,
+    siguienteUmbralMinutos = siguienteUmbralMinutos
+)
+
+fun RespuestaPagoDto.dominio() = CobroResultado(
+    idPago = idPago,
+    idPedido = idPedido,
+    metodo = metodo,
+    importeCentimos = centimos(importe.content),
+    importeRecibidoCentimos = importeRecibido?.let { centimos(it.content) } ?: centimos(importe.content),
+    vueltoCentimos = vuelto?.let { centimos(it.content) } ?: 0L,
+    estado = estado
 )
 
 fun Linea.request() = DetalleRequest(idProducto, cantidad, observaciones)
@@ -94,6 +120,7 @@ fun AuditoriaPedidoDto.dominio() = AuditoriaRegistro(
     idPedido = idPedido,
     accion = accion,
     usuario = usuarioActor,
-    motivo = motivo,
-    fechaHora = fechaHora
+    motivo = motivoFinal,
+    fechaHora = fechaHora,
+    nombreEntidad = nombre_entidad ?: "PEDIDO"
 )

@@ -14,8 +14,12 @@ interface PosRepository {
     suspend fun mesas(): List<Mesa>
     suspend fun categorias(): List<Categoria>
     suspend fun productos(): List<Producto>
+    suspend fun todosProductos(): List<Producto>
     suspend fun crear(b: Borrador): Pedido
     suspend fun pedido(id: Long): Pedido
+    suspend fun pedidosActivosSalon(): List<Pedido>
+    suspend fun pendientesCobro(): List<Pedido>
+    suspend fun pedidoPendienteCobro(idPedido: Long): Pedido
     suspend fun editar(id: Long, lineas: List<Linea>): Pedido
     suspend fun enviar(id: Long): Pedido
     suspend fun trasladar(id: Long, destino: Long, motivo: String)
@@ -33,9 +37,9 @@ interface PosRepository {
     suspend fun aperturaCaja(montoInicial: Double): TurnoCaja
     suspend fun turnoAbierto(): TurnoCaja?
     suspend fun resumenPago(idPedido: Long): pe.edu.upeu.nullpointerpos.data.remote.dto.ResumenPagoDto
-    suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double)
-    suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String)
-    suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>)
+    suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double): CobroResultado
+    suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String): CobroResultado
+    suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>): CobroResultado
     suspend fun cierreCaja(idTurno: Long, efectivoReal: Double, motivo: String): CierreCajaInfo
     suspend fun simularTarjeta(solicitud: pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudSimularTarjeta): pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaSimuladorTarjeta
     suspend fun emitirComprobanteSunat(solicitud: pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante): pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat
