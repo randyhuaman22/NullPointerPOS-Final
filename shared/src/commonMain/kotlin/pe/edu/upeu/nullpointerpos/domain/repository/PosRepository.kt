@@ -47,7 +47,8 @@ interface PosRepository {
     // Sprint 3 - Facturación, Descuentos & WhatsApp
     suspend fun buscarCliente(tipo: String, numero: String): ClienteDoc?
     suspend fun guardarCliente(cliente: ClienteDoc)
-    suspend fun ticketWhatsApp(idPedido: Long, telefono: String, idTurno: Long)
+    suspend fun ticketWhatsApp(idPedido: Long, telefono: String, idTurno: Long): pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto
+    suspend fun descargarPdfComprobante(idComprobante: Long): ByteArray
     suspend fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String)
     suspend fun anularPedido(idPedido: Long, motivo: String)
 

@@ -23,6 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -117,7 +120,16 @@ fun App() {
                 if (splashActivo) {
                     SplashScreen(darkTheme = s.modoOscuro)
                 } else {
-                    if (s.sesion == null) Login(s, vm) else Shell(s, vm)
+                    AnimatedContent(
+                        targetState = s.sesion == null,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(320)) + slideInVertically { it / 16 }) togetherWith
+                                fadeOut(animationSpec = tween(220))
+                        },
+                        label = "AuthTransition"
+                    ) { sinSesion ->
+                        if (sinSesion) Login(s, vm) else Shell(s, vm)
+                    }
                 }
             }
         }
@@ -443,8 +455,20 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
 
             Spacer(Modifier.height(4.dp))
 
-            s.error?.let { Notice(it, true, vm::limpiarAvisos) }
-            s.mensaje?.let { Notice(it, onClose = vm::limpiarAvisos) }
+            AnimatedVisibility(
+                visible = s.error != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                s.error?.let { Notice(it, true, vm::limpiarAvisos) }
+            }
+            AnimatedVisibility(
+                visible = s.mensaje != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                s.mensaje?.let { Notice(it, onClose = vm::limpiarAvisos) }
+            }
 
             // 1. Campo Código de Trabajador con teclado nativo
             OutlinedTextField(
@@ -637,7 +661,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
     val destinos = buildList {
         if (s.puedeMesas) {
             add(Triple("Salón", Icons.Default.GridView, "Mesas y atención"))
-            add(Triple("Comanda", Icons.Default.ReceiptLong, "Toma de pedidos"))
+            add(Triple("Comanda", Icons.AutoMirrored.Filled.ReceiptLong, "Toma de pedidos"))
         }
         if (s.puedeCocina) {
             add(Triple("Cocina", Icons.Default.OutdoorGrill, "KDS Producción"))
@@ -887,7 +911,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                     ) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(VerdeEsmeralda))
                         Text(
-                            s.servidor.ifBlank { "http://192.168.1.6:8080" },
+                            s.servidor.ifBlank { "http://localhost:8080" },
                             style = MaterialTheme.typography.labelSmall,
                             color = LocalColores.current.textoSecundario,
                             maxLines = 1,
@@ -982,22 +1006,44 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
             Column(
                 Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).background(MaterialTheme.colorScheme.background)
             ) {
-                if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Borgona)
-                if (s.error != null || s.mensaje != null) {
+                AnimatedVisibility(
+                    visible = s.busy,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    LinearProgressIndicator(
+                        Modifier.fillMaxWidth(),
+                        color = if (s.modoOscuro) AmbarDorado else Borgona
+                    )
+                }
+                AnimatedVisibility(
+                    visible = s.error != null || s.mensaje != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         Notice(s.error ?: s.mensaje.orEmpty(), s.error != null, vm::limpiarAvisos)
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (s.pagina) {
-                        "Salón", "Mesas" -> Salon(s, vm)
-                        "Comanda" -> Comanda(s, vm)
-                        "Cocina" -> CocinaKds(s, vm)
-                        "Caja" -> CajaScreen(s, vm)
-                        "Almacén", "Stock" -> AlmacenScreen(s, vm)
-                        "Reportes" -> ReportesScreen(s, vm)
-                        "Usuarios" -> Usuarios(s, vm)
-                        else -> Cuenta(s, vm)
+                    AnimatedContent(
+                        targetState = s.pagina,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(220)) + slideInHorizontally { it / 20 }) togetherWith
+                                (fadeOut(animationSpec = tween(180)) + slideOutHorizontally { -it / 20 })
+                        },
+                        label = "PageTransition"
+                    ) { pag ->
+                        when (pag) {
+                            "Salón", "Mesas" -> Salon(s, vm)
+                            "Comanda" -> Comanda(s, vm)
+                            "Cocina" -> CocinaKds(s, vm)
+                            "Caja" -> CajaScreen(s, vm)
+                            "Almacén", "Stock" -> AlmacenScreen(s, vm)
+                            "Reportes" -> ReportesScreen(s, vm)
+                            "Usuarios" -> Usuarios(s, vm)
+                            else -> Cuenta(s, vm)
+                        }
                     }
                 }
             }
@@ -1012,12 +1058,21 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
 @Composable
 private fun Salon(s: PosUiState, vm: PosViewModel) {
     val c = LocalColores.current
+    val acento = if (s.modoOscuro) AmbarDorado else Borgona
     var filtro by rememberSaveable { mutableStateOf("Todas") }
     var area by rememberSaveable { mutableStateOf("Todo el Salón") }
 
-    val totalLibres = s.mesas.count { it.estado == "LIBRE" }
-    val totalOcupadas = s.mesas.count { it.estado == "OCUPADA" }
+    val totalLibres by animateIntAsState(s.mesas.count { it.estado == "LIBRE" }, label = "libres")
+    val totalOcupadas by animateIntAsState(s.mesas.count { it.estado == "OCUPADA" }, label = "ocupadas")
     val totalMesas = s.mesas.size
+
+    val pulsoTransition = rememberInfiniteTransition(label = "liveDot")
+    val pulsoAlpha by pulsoTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "dotAlpha"
+    )
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Spacer(Modifier.height(2.dp))
@@ -1039,9 +1094,14 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(VerdeEsmeralda))
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(VerdeEsmeralda.copy(alpha = if (s.socketConectado) pulsoAlpha else 1f))
+                    )
                     Text(
-                        if (s.socketConectado) ":8080/ws/cocina · En vivo" else "Servidor :8080 Conectado",
+                        if (s.socketConectado) "WebSocket En Vivo · Sincronizado" else "Conectado a ${s.servidor.removePrefix("http://").removePrefix("https://")}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = c.textoPrincipal
@@ -1052,15 +1112,15 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = c.contenedor,
-                modifier = Modifier.clickable { vm.refrescar() }
+                modifier = Modifier.clickable(enabled = !s.busy) { vm.refrescar() }
             ) {
                 Row(
                     Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp), tint = Borgona)
-                    Text("Sincronizar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Borgona)
+                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp), tint = acento)
+                    Text("Sincronizar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = acento)
                 }
             }
         }
@@ -1389,7 +1449,7 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                         when {
                                             libre -> Icons.Default.AddShoppingCart
                                             tieneBorradorLocal -> Icons.Default.EditNote
-                                            else -> Icons.Default.ReceiptLong
+                                            else -> Icons.AutoMirrored.Filled.ReceiptLong
                                         },
                                         null,
                                         modifier = Modifier.size(14.dp)
@@ -1660,7 +1720,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                         dinero(p.precioCentimos),
                                                         style = MaterialTheme.typography.titleMedium,
                                                         fontWeight = FontWeight.ExtraBold,
-                                                        color = Borgona
+                                                        color = if (s.modoOscuro) AmbarDorado else Borgona
                                                     )
 
                                                     if (cantBorrador == 0) {
@@ -1883,7 +1943,11 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
 
         // Dock Inferior Táctil Flotante (Menú) o Resumen Completo (Comanda)
         if (tab == "Menú") {
-            if (b.lineas.isNotEmpty()) {
+            AnimatedVisibility(
+                visible = b.lineas.isNotEmpty(),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
                 Surface(
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                     color = c.superficie,
@@ -1913,7 +1977,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 dinero(b.lineas.total()),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Borgona
+                                color = if (s.modoOscuro) AmbarDorado else Borgona
                             )
                         }
 
@@ -1953,7 +2017,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                     HorizontalDivider(color = c.borde)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Total Comanda:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
-                        Text(dinero(totalCalculado), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Borgona)
+                        Text(dinero(totalCalculado), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
                     }
 
                     if (s.editable) {
@@ -1972,7 +2036,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 colors = ButtonDefaults.buttonColors(containerColor = Borgona),
                                 modifier = Modifier.weight(1f).height(48.dp)
                             ) {
-                                Icon(Icons.Default.Send, null)
+                                Icon(Icons.AutoMirrored.Filled.Send, null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("Enviar a Cocina", fontWeight = FontWeight.Bold)
                             }
@@ -2210,6 +2274,16 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
 
         s.cocinaAviso?.let { Notice(it, true) }
 
+        OutlinedTextField(
+            value = buscar,
+            onValueChange = { buscar = it },
+            label = { Text("Filtrar mesa o plato en cocina...") },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = if (s.modoOscuro) AmbarDorado else Borgona) },
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+
         // Filtros de comandas
         Chips(listOf("Todos", "Enviados", "En preparación", "Listos"), filtro) { filtro = it }
 
@@ -2246,13 +2320,19 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                         "AMARILLO", "ALERTA" -> c.ambarBg
                         else -> c.verdeBg
                     }
+                    val bordeAnimado by animateColorAsState(colorEspera, label = "kdsBorder")
+                    val listosCount = p.lineas.count { it.estado == "LISTO" || it.estado == "ENTREGADO" }
+                    val progresoKds by animateFloatAsState(
+                        targetValue = if (p.lineas.isEmpty()) 0f else listosCount.toFloat() / p.lineas.size,
+                        label = "kdsProg"
+                    )
 
                     Surface(
                         shape = RoundedCornerShape(18.dp),
                         color = c.superficie,
-                        border = BorderStroke(2.dp, colorEspera),
+                        border = BorderStroke(2.dp, bordeAnimado),
                         shadowElevation = 4.dp,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().animateContentSize()
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -2262,7 +2342,7 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                             ) {
                                 Column {
                                     Text("MESA ${p.codigoMesa}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
-                                    Text("${p.codigoPedido} · Mozo: ${p.codigoMozo.orEmpty()}", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
+                                    Text("${p.codigoPedido} · Mozo: ${p.codigoMozo.orEmpty()} · $listosCount/${p.lineas.size} listos", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
                                 }
                                 Surface(shape = RoundedCornerShape(20.dp), color = bgEspera) {
                                     Row(
@@ -2276,7 +2356,12 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                                 }
                             }
 
-                            HorizontalDivider(color = c.borde)
+                            LinearProgressIndicator(
+                                progress = { progresoKds },
+                                modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
+                                color = if (listosCount == p.lineas.size && p.lineas.isNotEmpty()) VerdeEsmeralda else colorEspera,
+                                trackColor = c.borde
+                            )
 
                             // Lista de platos con botón táctil individual FUNCIONAL (idDetallePedido)
                             p.lineas.forEach { l ->
@@ -2447,6 +2532,13 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
         }
     }
 
+    LaunchedEffect(s.pedido?.idPedido) {
+        numDoc = ""
+        razonSocialCliente = ""
+        direccionCliente = ""
+        efectivoRecibido = ""
+    }
+
     // Descuento y Anulación Modal State
     var descuentoModal by remember { mutableStateOf(false) }
     var porcentajeDesc by remember { mutableStateOf("10.0") }
@@ -2510,7 +2602,18 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.LockClock, null, tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
-                        Text("Turno de Caja No Iniciado", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                        Text("Turno de Caja No Iniciado", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal, modifier = Modifier.weight(1f))
+                        if (s.pendientesCobro.isNotEmpty()) {
+                            Surface(shape = RoundedCornerShape(10.dp), color = c.ambarBg) {
+                                Text(
+                                    "${s.pendientesCobro.size} en espera",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                )
+                            }
+                        }
                     }
                     Text("Ingresa el fondo inicial en efectivo para habilitar los cobros del restaurante.", style = MaterialTheme.typography.bodyMedium, color = c.textoSecundario)
                     OutlinedTextField(
@@ -2533,33 +2636,41 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                 }
             }
         } else {
-            // Tarjeta de Turno Abierto
+            // Tarjeta de Turno Abierto con gradiente profesional Bistro
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = c.superficie,
-                border = BorderStroke(1.5.dp, VerdeEsmeralda),
-                shadowElevation = 3.dp,
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent,
+                shadowElevation = 5.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Surface(shape = CircleShape, color = c.verdeBg, modifier = Modifier.size(10.dp)) {}
-                            Text("Turno Abierto #${turno.idTurno}", fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Brush.linearGradient(listOf(Borgona, BorgonaOscuro)))
+                        .padding(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.size(10.dp).clip(CircleShape).background(VerdeEsmeralda))
+                                Text("Turno Abierto #${turno.idTurno}", fontWeight = FontWeight.ExtraBold, color = BlancoPuro, fontSize = 15.sp)
+                            }
+                            Button(
+                                onClick = { cerrarCajaModal = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = BlancoPuro.copy(alpha = 0.18f), contentColor = BlancoPuro),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("Cerrar Turno", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
-                        Button(
-                            onClick = { cerrarCajaModal = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = RojoCoral),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text("Cerrar Turno (Arqueo)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Cajero: ${s.sesion?.usuario?.nombreCompleto} (${turno.cajero})", style = MaterialTheme.typography.bodyMedium, color = BlancoPuro.copy(alpha = 0.9f))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Fondo Inicial: ${dinero(turno.montoInicialCentimos)}", style = MaterialTheme.typography.bodySmall, color = AmbarDorado, fontWeight = FontWeight.Bold)
+                            Surface(shape = RoundedCornerShape(8.dp), color = VerdeEsmeralda.copy(alpha = 0.25f)) {
+                                Text("OPERATIVO · ${s.pendientesCobro.size} POR COBRAR", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = BlancoPuro)
+                            }
                         }
-                    }
-                    Text("Cajero: ${s.sesion?.usuario?.nombreCompleto} (${turno.cajero})", style = MaterialTheme.typography.bodyMedium, color = c.textoPrincipal)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Fondo Inicial: ${dinero(turno.montoInicialCentimos)}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
-                        Text("Estado: OPERATIVO", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
                     }
                 }
             }
@@ -3271,6 +3382,15 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
 
     // Modal de Comprobante Electrónico SUNAT Beta emitido
     s.comprobanteEmitido?.let { comp ->
+        var telReenvio by rememberSaveable(comp.idComprobante) { mutableStateOf(telefonoWhatsApp) }
+        var selloVisible by remember(comp.idComprobante) { mutableStateOf(false) }
+        LaunchedEffect(comp.idComprobante) { selloVisible = true }
+        val escalaSello by animateFloatAsState(
+            targetValue = if (selloVisible) 1f else 0.7f,
+            animationSpec = spring(dampingRatio = 0.55f, stiffness = 360f),
+            label = "selloSunat"
+        )
+
         AlertDialog(
             onDismissRequest = { vm.cerrarComprobanteModal() },
             title = {
@@ -3283,7 +3403,11 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         Text("Comprobante Electrónico", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         Text(comp.numeroFinal, fontSize = 12.sp, color = VerdeEsmeralda, fontWeight = FontWeight.Bold)
                     }
-                    Surface(shape = RoundedCornerShape(8.dp), color = c.verdeBg) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = c.verdeBg,
+                        modifier = Modifier.graphicsLayer { scaleX = escalaSello; scaleY = escalaSello }
+                    ) {
                         Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Verified, null, tint = VerdeEsmeralda, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
@@ -3356,7 +3480,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(Icons.Default.QrCode2, null, modifier = Modifier.size(96.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
+                            Icon(Icons.Default.QrCode2, null, modifier = Modifier.size(84.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
                             Text(comp.descripcionFinal, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal, textAlign = TextAlign.Center)
                             Text("Firma Digital Hash: ${comp.hashFinal.take(20)}...", fontSize = 10.sp, color = c.textoSecundario)
                         }
@@ -3385,6 +3509,99 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                         }
                     }
+
+                    // Sección de envío real PDF 80mm por WhatsApp (Green-API)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = c.superficie,
+                        border = BorderStroke(1.dp, c.borde),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Envío de PDF por WhatsApp", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.textoPrincipal)
+                            s.whatsappResultado?.let { wa ->
+                                val esOk = wa.estado == "ENVIADO"
+                                val esPend = wa.estado == "PENDIENTE_CONFIGURACION"
+                                val bg = when {
+                                    esOk -> c.verdeBg
+                                    esPend -> c.ambarBg
+                                    else -> c.rojoBg
+                                }
+                                val fg = when {
+                                    esOk -> VerdeEsmeralda
+                                    esPend -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                    else -> RojoCoral
+                                }
+                                Surface(shape = RoundedCornerShape(8.dp), color = bg, modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(
+                                            when {
+                                                esOk -> Icons.Default.MarkChatRead
+                                                esPend -> Icons.Default.Info
+                                                else -> Icons.Default.ErrorOutline
+                                            },
+                                            null,
+                                            tint = fg,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            if (esOk) "PDF ${wa.archivoPdf ?: "${comp.numeroFinal}.pdf"} enviado a WhatsApp"
+                                            else wa.detalle?.takeIf { it.isNotBlank() } ?: wa.mensaje,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = fg
+                                        )
+                                    }
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = telReenvio,
+                                    onValueChange = { telReenvio = it.filter { ch -> ch.isDigit() || ch == '+' }.take(15) },
+                                    label = { Text("Celular (ej. 987654321)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Button(
+                                    onClick = { vm.ticketWhatsApp(comp.idPedido, telReenvio) },
+                                    enabled = !s.busy && telReenvio.count(Char::isDigit) >= 9,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = VerdeEsmeralda),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("PDF", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    // Acciones PDF 80mm reales
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { vm.abrirPdfComprobante(comp.idComprobante, comp.numeroFinal, compartir = false) },
+                            enabled = !s.busy && comp.idComprobante > 0L,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Ver PDF 80mm", fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { vm.abrirPdfComprobante(comp.idComprobante, comp.numeroFinal, compartir = true) },
+                            enabled = !s.busy && comp.idComprobante > 0L,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Compartir PDF", fontSize = 11.sp)
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -3398,17 +3615,6 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                     Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Finalizar Venta")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = {
-                        vm.cerrarComprobanteModal()
-                    }
-                ) {
-                    Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Imprimir Tiquetera (80mm)", fontSize = 12.sp)
                 }
             }
         )
@@ -3454,7 +3660,7 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
                 enabled = s.insumos.isNotEmpty() && !s.busy,
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.TrendingDown, null, modifier = Modifier.size(16.dp), tint = RojoCoral)
+                Icon(Icons.AutoMirrored.Filled.TrendingDown, null, modifier = Modifier.size(16.dp), tint = RojoCoral)
                 Spacer(Modifier.width(4.dp))
                 Text("Registrar Merma", fontSize = 12.sp, color = RojoCoral)
             }
@@ -3589,11 +3795,22 @@ private fun CompraInsumoDialog(
         title = { Text("Ingreso por Compra", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Selecciona insumo:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                insumos.take(8).forEach { ins ->
-                    Row(Modifier.fillMaxWidth().clickable { seleccionado = ins }, verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = seleccionado.idInsumo == ins.idInsumo, onClick = { seleccionado = ins })
-                        Text("${ins.nombre} (${ins.stockActual} ${ins.unidadMedida})", fontSize = 13.sp)
+                Text("Selecciona insumo (${insumos.size}):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Column(Modifier.fillMaxWidth().heightIn(max = 150.dp).verticalScroll(rememberScrollState())) {
+                    insumos.forEach { ins ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                seleccionado = ins
+                                costo = ins.costoUnitario.toString()
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = seleccionado.idInsumo == ins.idInsumo, onClick = {
+                                seleccionado = ins
+                                costo = ins.costoUnitario.toString()
+                            })
+                            Text("${ins.nombre} (${ins.stockActual} ${ins.unidadMedida})", fontSize = 13.sp)
+                        }
                     }
                 }
                 OutlinedTextField(proveedor, { proveedor = it }, label = { Text("Proveedor *") }, modifier = Modifier.fillMaxWidth())
@@ -3632,11 +3849,16 @@ private fun MermaInsumoDialog(
         title = { Text("Registro de Merma", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Selecciona insumo:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                insumos.take(8).forEach { ins ->
-                    Row(Modifier.fillMaxWidth().clickable { seleccionado = ins }, verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = seleccionado.idInsumo == ins.idInsumo, onClick = { seleccionado = ins })
-                        Text("${ins.nombre} (${ins.stockActual} ${ins.unidadMedida})", fontSize = 13.sp)
+                Text("Selecciona insumo (${insumos.size}):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Column(Modifier.fillMaxWidth().heightIn(max = 150.dp).verticalScroll(rememberScrollState())) {
+                    insumos.forEach { ins ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { seleccionado = ins },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = seleccionado.idInsumo == ins.idInsumo, onClick = { seleccionado = ins })
+                            Text("${ins.nombre} (${ins.stockActual} ${ins.unidadMedida})", fontSize = 13.sp)
+                        }
                     }
                 }
                 OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad mermada *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
@@ -3733,7 +3955,7 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Icon(Icons.Default.ShowChart, null, tint = if (s.modoOscuro) AmbarDorado else Borgona, modifier = Modifier.size(22.dp))
+                                        Icon(Icons.AutoMirrored.Filled.ShowChart, null, tint = if (s.modoOscuro) AmbarDorado else Borgona, modifier = Modifier.size(22.dp))
                                         Text("Curva de Flujo Operativo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = c.textoPrincipal)
                                     }
                                     Text("Hora Perú (UTC-5)", style = MaterialTheme.typography.labelSmall, color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold)
@@ -3752,9 +3974,14 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                     horasMostrar.forEach { hora ->
                                         val vh = ventasPorHoraMap[hora]
                                         val esPicoReal = horaPico != null && hora == horaPico && (vh?.totalVendidoCentimos ?: 0L) > 0L
-                                        val alturaDp = if (vh != null && vh.totalVendidoCentimos > 0L) {
+                                        val alturaDpObjetiva = if (vh != null && vh.totalVendidoCentimos > 0L) {
                                             (14 + (54f * vh.totalVendidoCentimos / maxVentaCent).toInt()).dp
                                         } else 6.dp
+                                        val alturaAnimada by animateDpAsState(
+                                            targetValue = alturaDpObjetiva,
+                                            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                                            label = "barHora$hora"
+                                        )
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             if (esPicoReal) {
                                                 Surface(shape = CircleShape, color = Borgona, modifier = Modifier.size(22.dp)) {
@@ -3770,7 +3997,7 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                             Box(
                                                 Modifier
                                                     .width(18.dp)
-                                                    .height(alturaDp)
+                                                    .height(alturaAnimada)
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         when {
@@ -4108,7 +4335,7 @@ private fun Cuenta(s: PosUiState, vm: PosViewModel) {
                     }
                 }
 
-                Text("Servidor Gateway: ${s.servidor.ifBlank { "http://192.168.1.6:8080" }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                Text("Servidor Gateway: ${s.servidor.ifBlank { "http://localhost:8080" }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                 Text("Sistema NullPointer POS con arquitectura limpia para Sprints 1, 2 y 3.", style = MaterialTheme.typography.bodySmall, color = LocalColores.current.textoSecundario)
             }
         }

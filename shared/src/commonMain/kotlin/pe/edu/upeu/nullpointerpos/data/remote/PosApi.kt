@@ -128,9 +128,11 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
         call("clientes", HttpMethod.Put, b)
     }
 
-    suspend fun ticketWhatsApp(b: TicketWhatsAppRequest) {
-        call("tickets/whatsapp", HttpMethod.Post, b)
-    }
+    suspend fun ticketWhatsApp(b: TicketWhatsAppRequest): RespuestaTicketWhatsAppDto =
+        call("tickets/whatsapp", HttpMethod.Post, b).body()
+
+    suspend fun descargarPdfComprobante(idComprobante: Long): ByteArray =
+        call("comprobantes/$idComprobante/pdf").readBytes()
 
     suspend fun aplicarDescuento(idPedido: Long, b: DescuentoPedidoRequest) {
         call("pedidos/$idPedido/descuento", HttpMethod.Patch, b)

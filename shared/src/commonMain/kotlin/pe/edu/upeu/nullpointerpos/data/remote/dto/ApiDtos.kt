@@ -217,6 +217,16 @@ data class TicketWhatsAppRequest(
 )
 
 @Serializable
+data class RespuestaTicketWhatsAppDto(
+    val idTicket: Long = 0L,
+    val estado: String = "PENDIENTE_CONFIGURACION",
+    val archivoPdf: String? = null,
+    val mensaje: String = "",
+    val detalle: String? = null,
+    val contenido: String? = null
+)
+
+@Serializable
 data class DescuentoPedidoRequest(
     val porcentaje: Double,
     val motivo: String

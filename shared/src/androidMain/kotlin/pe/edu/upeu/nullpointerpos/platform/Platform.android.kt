@@ -36,6 +36,44 @@ actual fun avisarPedido() {
     runCatching { val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70); tone.startTone(ToneGenerator.TONE_PROP_ACK, 180); Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 400) }
 }
 
+actual fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean): String? {
+    return runCatching {
+        val dir = java.io.File(androidContext.cacheDir, "comprobantes").apply { mkdirs() }
+        val safe = nombreArchivo.replace(Regex("[^A-Za-z0-9._-]"), "_").let {
+            if (it.lowercase().endsWith(".pdf")) it else "$it.pdf"
+        }
+        val file = java.io.File(dir, safe).apply { writeBytes(bytes) }
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            androidContext,
+            "${androidContext.packageName}.fileprovider",
+            file
+        )
+        val baseIntent = if (compartir) {
+            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                putExtra(android.content.Intent.EXTRA_TEXT, "Comprobante Electrónico Wendy's Food: $safe")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+        val chooser = android.content.Intent.createChooser(
+            baseIntent,
+            if (compartir) "Compartir comprobante PDF" else "Ver o imprimir comprobante 80mm"
+        ).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        androidContext.startActivity(chooser)
+        null
+    }.getOrElse { e ->
+        "No se pudo abrir el PDF en este dispositivo: ${e.message ?: "Error desconocido"}"
+    }
+}
+
 @Composable
 actual fun WendysLogo(modifier: Modifier) {
     val bitmap = remember {

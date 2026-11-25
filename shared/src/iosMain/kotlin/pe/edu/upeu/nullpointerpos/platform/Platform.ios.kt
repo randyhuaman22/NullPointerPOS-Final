@@ -23,6 +23,8 @@ actual fun preferencias(): Preferencias = object : Preferencias {
 actual fun motorHttp(): HttpClientEngine = Darwin.create()
 actual fun servidorInicial() = "http://localhost:8080"
 actual fun avisarPedido() { AudioServicesPlaySystemSound(1007u) }
+actual fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean): String? =
+    "Vista/descarga directa de PDF disponible en Android."
 
 @Composable
 actual fun WendysLogo(modifier: Modifier) {

@@ -356,9 +356,9 @@ class PosViewModel(
                 error = null
             )
         }
-        val conservar = previo?.idPedido == p.idPedido && !previo.creacionIncierta && p.estado == "BORRADOR"
-        persistir(Borrador(p.idMesa, if (conservar) previo!!.lineas else p.lineas,
-            if (conservar) previo!!.observaciones else p.observaciones.orEmpty(), p.idPedido))
+        val conservar = previo != null && previo.idPedido == p.idPedido && !previo.creacionIncierta && p.estado == "BORRADOR"
+        persistir(Borrador(p.idMesa, if (conservar) previo.lineas else p.lineas,
+            if (conservar) previo.observaciones else p.observaciones.orEmpty(), p.idPedido))
     }
 
     private fun cambio(block: (Borrador) -> Borrador) {
@@ -670,10 +670,25 @@ class PosViewModel(
                 .onFailure { avisoExtra += " · SUNAT: ${it.message}" }
         }
 
+        var whatsappRes: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto? = null
         if (enviarWhatsapp && !telefonoWhatsapp.isNullOrBlank()) {
-            runCatching { repo.ticketWhatsApp(idPedido, telefonoWhatsapp.trim(), t.idTurno) }
-                .onSuccess { avisoExtra += " · Ticket enviado a WhatsApp" }
-                .onFailure { avisoExtra += " · WhatsApp: ${it.message}" }
+            val tel = telefonoWhatsapp.filter { it.isDigit() || it == '+' }
+            runCatching { repo.ticketWhatsApp(idPedido, tel, t.idTurno) }
+                .onSuccess { res ->
+                    whatsappRes = res
+                    avisoExtra += when (res.estado) {
+                        "ENVIADO" -> " · PDF ${res.archivoPdf ?: ""} enviado por WhatsApp"
+                        "PENDIENTE_CONFIGURACION" -> " · WhatsApp pendiente de configurar"
+                        else -> " · WhatsApp: ${res.detalle ?: res.mensaje}"
+                    }
+                }
+                .onFailure {
+                    whatsappRes = pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto(
+                        estado = "ERROR_ENVIO",
+                        mensaje = it.message ?: "No se pudo conectar para enviar WhatsApp"
+                    )
+                    avisoExtra += " · WhatsApp: ${it.message}"
+                }
         }
 
         val resumenCobro = when (met) {
@@ -685,6 +700,7 @@ class PosViewModel(
         _state.update {
             it.copy(
                 comprobanteEmitido = comprobante,
+                whatsappResultado = whatsappRes,
                 transaccionTarjeta = null,
                 clienteSeleccionado = null,
                 mensaje = "$resumenCobro$avisoExtra"
@@ -788,7 +804,7 @@ class PosViewModel(
     }
 
     fun cerrarComprobanteModal() {
-        _state.update { it.copy(comprobanteEmitido = null) }
+        _state.update { it.copy(comprobanteEmitido = null, whatsappResultado = null) }
     }
 
     fun buscarCliente(tipo: String, numero: String) = task {
@@ -797,9 +813,38 @@ class PosViewModel(
     }
 
     fun ticketWhatsApp(idPedido: Long, telefono: String) = task {
-        val t = _state.value.turnoCaja ?: error("Se requiere turno de caja activo.")
-        repo.ticketWhatsApp(idPedido, telefono, t.idTurno)
-        _state.update { it.copy(mensaje = "Ticket digital enviado a WhatsApp $telefono") }
+        val tel = telefono.filter { it.isDigit() || it == '+' }
+        require(tel.count(Char::isDigit) in 9..15) { "Ingresa un número de WhatsApp válido (9 a 15 dígitos)." }
+        val res = repo.ticketWhatsApp(idPedido, tel, _state.value.turnoCaja?.idTurno ?: 0L)
+        _state.update {
+            when (res.estado) {
+                "ENVIADO" -> it.copy(
+                    whatsappResultado = res,
+                    mensaje = "PDF ${res.archivoPdf.orEmpty()} enviado por WhatsApp a $tel"
+                )
+                "PENDIENTE_CONFIGURACION" -> it.copy(
+                    whatsappResultado = res,
+                    error = res.mensaje.ifBlank { "Falta configurar Green-API en el servidor." }
+                )
+                else -> it.copy(
+                    whatsappResultado = res,
+                    error = res.detalle?.ifBlank { null } ?: res.mensaje.ifBlank { "No se pudo enviar el PDF por WhatsApp." }
+                )
+            }
+        }
+    }
+
+    fun abrirPdfComprobante(idComprobante: Long, numeroComprobante: String, compartir: Boolean = false) = task {
+        val bytes = repo.descargarPdfComprobante(idComprobante)
+        val nombre = numeroComprobante.ifBlank { "Comprobante-$idComprobante" }
+        val error = pe.edu.upeu.nullpointerpos.platform.abrirPdfLocal(nombre, bytes, compartir)
+        if (error != null) {
+            _state.update { it.copy(error = error) }
+        } else {
+            _state.update {
+                it.copy(mensaje = if (compartir) "Compartiendo PDF $nombre..." else "Abriendo PDF 80mm $nombre...")
+            }
+        }
     }
 
     fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String) = task {

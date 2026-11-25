@@ -39,6 +39,7 @@ data class PosUiState(
     val clienteSeleccionado: ClienteDoc? = null,
     val transaccionTarjeta: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaSimuladorTarjeta? = null,
     val comprobanteEmitido: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat? = null,
+    val whatsappResultado: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto? = null,
 
     // Inventario y Almacén (Sprint 3)
     val insumos: List<Insumo> = emptyList(),

@@ -89,4 +89,51 @@ class ContratoApiTest {
         store.servidor = "http://10.40.50.120:8080"
         assertEquals("http://10.40.50.120:8080", store.servidor)
     }
+
+    @Test fun whatsappPdfYDescargaComprobanteConMockEngine() = runTest {
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val errorDto = jsonParser.decodeFromString<RespuestaTicketWhatsAppDto>(
+            """{"idTicket":15,"estado":"ERROR_ENVIO","mensaje":"Número inválido","detalle":"Green-API 400"}"""
+        )
+        assertEquals(15L, errorDto.idTicket)
+        assertEquals("ERROR_ENVIO", errorDto.estado)
+        assertEquals("Green-API 400", errorDto.detalle)
+
+        val pdfEsperado = "%PDF-1.4\n1 0 obj\n%%EOF".encodeToByteArray()
+        val engine = MockEngine { request ->
+            assertEquals("Bearer jwt", request.headers[HttpHeaders.Authorization])
+            when (request.url.encodedPath) {
+                "/api/v1/tickets/whatsapp" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    respond(
+                        """{"idTicket":21,"estado":"ENVIADO","archivoPdf":"B001-00000001.pdf","mensaje":"PDF enviado correctamente por WhatsApp","detalle":"idMessage=BAE5A","contenido":"Ticket 80mm"}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+                "/api/v1/comprobantes/1/pdf" -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    respond(
+                        content = pdfEsperado,
+                        headers = headersOf(HttpHeaders.ContentType, "application/pdf")
+                    )
+                }
+                else -> error("Ruta inesperada: ${request.url.encodedPath}")
+            }
+        }
+        val client = HttpClient(engine) { install(ContentNegotiation) { json(jsonParser) } }
+        val store = LocalStore(prefs).apply { servidor = "http://localhost:8080" }
+        val session = SessionContext().apply { token = "jwt" }
+        try {
+            val api = PosApi(client, store, session)
+            val resp = api.ticketWhatsApp(TicketWhatsAppRequest(idPedido = 9L, telefono = "51999888777"))
+            assertEquals(21L, resp.idTicket)
+            assertEquals("ENVIADO", resp.estado)
+            assertEquals("B001-00000001.pdf", resp.archivoPdf)
+
+            val pdfBytes = api.descargarPdfComprobante(1L)
+            assertTrue(pdfBytes.contentEquals(pdfEsperado))
+        } finally {
+            client.close()
+        }
+    }
 }

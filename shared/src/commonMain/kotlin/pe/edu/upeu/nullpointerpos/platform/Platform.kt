@@ -9,6 +9,7 @@ expect fun preferencias(): Preferencias
 expect fun motorHttp(): HttpClientEngine
 expect fun servidorInicial(): String
 expect fun avisarPedido()
+expect fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean = false): String?
 
 @Composable
 expect fun WendysLogo(modifier: Modifier = Modifier)

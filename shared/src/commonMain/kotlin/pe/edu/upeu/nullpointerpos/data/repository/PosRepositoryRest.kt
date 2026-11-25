@@ -100,9 +100,11 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
         api.guardarCliente(ClienteDto(cliente.tipoDocumento, cliente.numeroDocumento, cliente.razonSocial, cliente.razonSocial, cliente.direccion))
     }
 
-    override suspend fun ticketWhatsApp(idPedido: Long, telefono: String, idTurno: Long) {
+    override suspend fun ticketWhatsApp(idPedido: Long, telefono: String, idTurno: Long) =
         api.ticketWhatsApp(TicketWhatsAppRequest(idPedido, telefono))
-    }
+
+    override suspend fun descargarPdfComprobante(idComprobante: Long): ByteArray =
+        api.descargarPdfComprobante(idComprobante)
 
     override suspend fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String) {
         api.aplicarDescuento(idPedido, DescuentoPedidoRequest(porcentaje, motivo))
