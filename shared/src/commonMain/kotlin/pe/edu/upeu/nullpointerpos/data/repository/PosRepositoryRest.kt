@@ -52,22 +52,30 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun resumenPago(idPedido: Long) = api.resumenPago(idPedido)
 
     override suspend fun cobrarEfectivo(idPedido: Long, idTurno: Long, recibido: Double, total: Double) {
-        api.cobrarEfectivo(CobroEfectivoRequest(idPedido, idTurno, recibido, total, nuevaIdempotencia()))
+        val idem = nuevaIdempotencia()
+        api.cobrarEfectivo(CobroEfectivoRequest(idPedido, recibido, idem, idTurno, total, idem))
     }
 
     override suspend fun cobrarDigital(idPedido: Long, idTurno: Long, metodo: String, total: Double, operacion: String, ultimos4: String) {
-        api.cobrarDigital(CobroDigitalRequest(idPedido, idTurno, metodo, total, operacion, ultimos4, nuevaIdempotencia()))
+        val idem = nuevaIdempotencia()
+        val met = metodo.uppercase()
+        val op = operacion.ifBlank { "849201" }
+        val u4 = ultimos4.ifBlank { "0000" }.takeLast(4).padStart(4, '0')
+        api.cobrarDigital(CobroDigitalRequest(idPedido, met, op, u4, idem, met, idTurno, total, idem))
     }
 
     override suspend fun cobrarMixto(idPedido: Long, idTurno: Long, partes: List<Triple<String, Double, String?>>) {
+        val idem = nuevaIdempotencia()
         val partesDto = partes.map { (metodo, imp, op) ->
-            PartePagoDto(metodo, imp, op, op?.takeLast(4))
+            val met = metodo.uppercase()
+            val u4 = if (met.equals("EFECTIVO", ignoreCase = true)) "" else (op?.takeLast(4)?.padStart(4, '0') ?: "0000")
+            PartePagoDto(met, imp, op, u4, met)
         }
-        api.cobrarMixto(CobroMixtoRequest(idPedido, idTurno, partesDto, nuevaIdempotencia()))
+        api.cobrarMixto(CobroMixtoRequest(idPedido, idem, partesDto, idTurno, idem))
     }
 
     override suspend fun cierreCaja(idTurno: Long, efectivoReal: Double, motivo: String) =
-        api.cierreCaja(CierreCajaRequest(idTurno, efectivoReal, motivo)).dominio()
+        api.cierreCaja(CierreCajaRequest(efectivoReal, motivo, idTurno, efectivoReal, motivo)).dominio()
 
     override suspend fun simularTarjeta(solicitud: SolicitudSimularTarjeta): RespuestaSimuladorTarjeta {
         return runCatching {

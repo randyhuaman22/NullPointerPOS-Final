@@ -2944,25 +2944,26 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         Button(
                             onClick = {
                                 val idPed = pedidoActual.idPedido
+                                val idMesa = pedidoActual.idMesa
                                 when (metodoPago) {
                                     "Efectivo" -> {
                                         val rec = efectivoRecibido.toDoubleOrNull() ?: totalDouble
-                                        vm.cobrarEfectivo(idPed, rec, totalDouble)
+                                        vm.cobrarEfectivo(idPed, rec, totalDouble, idMesa)
                                     }
                                     "Yape / Plin" -> {
                                         val op = numOperacion.ifBlank { "849201" }
-                                        vm.cobrarDigital(idPed, "YAPE", totalDouble, op, "0000")
+                                        vm.cobrarDigital(idPed, "YAPE", totalDouble, op, "0000", idMesa)
                                     }
                                     "Tarjeta" -> {
                                         val auth = s.transaccionTarjeta?.codigoAutorizacion ?: "AUTH-829102"
                                         val ult4 = s.transaccionTarjeta?.ultimosCuatroDigitos ?: tarjetaNumero.replace(" ", "").takeLast(4).ifBlank { "0366" }
-                                        vm.cobrarDigital(idPed, "TARJETA", totalDouble, auth, ult4)
+                                        vm.cobrarDigital(idPed, "TARJETA", totalDouble, auth, ult4, idMesa)
                                     }
                                     "Mixto" -> {
                                         val efecD = mixtoEfectivo.toDoubleOrNull() ?: (totalDouble / 2.0)
                                         val digD = mixtoDigital.toDoubleOrNull() ?: (totalDouble - efecD)
                                         val op = mixtoNumOp.ifBlank { "839201" }
-                                        vm.cobrarMixto(idPed, listOf(Triple("EFECTIVO", efecD, null), Triple("YAPE", digD, op)))
+                                        vm.cobrarMixto(idPed, listOf(Triple("EFECTIVO", efecD, null), Triple("YAPE", digD, op)), idMesa)
                                     }
                                 }
 

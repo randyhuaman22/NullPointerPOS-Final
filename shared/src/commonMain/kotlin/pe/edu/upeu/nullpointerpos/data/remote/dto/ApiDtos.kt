@@ -89,11 +89,18 @@ data class AperturaCajaRequest(val montoInicial: Double)
 @Serializable
 data class TurnoCajaResponse(
     val idTurno: Long,
-    val cajero: String,
-    val montoInicial: JsonPrimitive,
-    val fechaApertura: String,
-    val estado: String
-)
+    val codigoCajero: String? = null,
+    val cajero: String? = null,
+    val montoInicial: JsonPrimitive = JsonPrimitive("0.00"),
+    val fechaApertura: String = "",
+    val estado: String = "ABIERTO",
+    val fechaCierre: String? = null,
+    val montoEsperado: JsonPrimitive? = null,
+    val montoReal: JsonPrimitive? = null,
+    val diferencia: JsonPrimitive? = null
+) {
+    val cajeroFinal: String get() = cajero?.ifBlank { null } ?: codigoCajero?.ifBlank { null } ?: "Cajero Wendy's"
+}
 
 @Serializable
 data class ResumenPagoDto(
@@ -107,55 +114,65 @@ data class ResumenPagoDto(
 @Serializable
 data class CobroEfectivoRequest(
     val idPedido: Long,
-    val idTurnoCaja: Long,
     val importeRecibido: Double,
-    val importeTotal: Double,
-    val llaveIdempotencia: String
+    val idempotencia: String,
+    val idTurnoCaja: Long? = null,
+    val importeTotal: Double? = null,
+    val llaveIdempotencia: String? = null
 )
 
 @Serializable
 data class CobroDigitalRequest(
     val idPedido: Long,
-    val idTurnoCaja: Long,
-    val metodoPago: String,
-    val importeTotal: Double,
+    val metodo: String,
     val numeroOperacion: String,
     val ultimosCuatroDigitos: String,
-    val llaveIdempotencia: String
+    val idempotencia: String,
+    val metodoPago: String? = null,
+    val idTurnoCaja: Long? = null,
+    val importeTotal: Double? = null,
+    val llaveIdempotencia: String? = null
 )
 
 @Serializable
 data class PartePagoDto(
-    val metodoPago: String,
+    val metodo: String,
     val importe: Double,
     val numeroOperacion: String? = null,
-    val ultimosCuatroDigitos: String? = null
+    val ultimosCuatroDigitos: String? = null,
+    val metodoPago: String? = null
 )
 
 @Serializable
 data class CobroMixtoRequest(
     val idPedido: Long,
-    val idTurnoCaja: Long,
+    val idempotencia: String,
     val partes: List<PartePagoDto>,
-    val llaveIdempotencia: String
+    val idTurnoCaja: Long? = null,
+    val llaveIdempotencia: String? = null
 )
 
 @Serializable
 data class CierreCajaRequest(
-    val idTurno: Long,
-    val montoEfectivoReal: Double,
-    val motivoCierre: String = "CIERRE NORMAL"
+    val importeReal: Double,
+    val motivo: String = "CIERRE NORMAL",
+    val idTurno: Long? = null,
+    val montoEfectivoReal: Double? = null,
+    val motivoCierre: String? = null
 )
 
 @Serializable
 data class CierreCajaResponse(
     val idTurno: Long,
-    val estado: String,
-    val montoInicial: JsonPrimitive,
-    val totalEfectivoEsperado: JsonPrimitive,
-    val totalEfectivoReal: JsonPrimitive,
-    val diferencia: JsonPrimitive,
-    val fechaCierre: String
+    val estado: String = "CERRADO",
+    val montoInicial: JsonPrimitive = JsonPrimitive("0.00"),
+    val totalEfectivo: JsonPrimitive? = null,
+    val totalEfectivoEsperado: JsonPrimitive? = null,
+    val totalEfectivoReal: JsonPrimitive? = null,
+    val montoEsperado: JsonPrimitive? = null,
+    val montoReal: JsonPrimitive? = null,
+    val diferencia: JsonPrimitive? = null,
+    val fechaCierre: String? = null
 )
 
 @Serializable

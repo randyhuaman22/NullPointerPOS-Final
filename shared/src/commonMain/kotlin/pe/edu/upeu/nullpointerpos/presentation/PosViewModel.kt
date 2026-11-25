@@ -389,11 +389,8 @@ class PosViewModel(
     private suspend fun cargarTurnoCaja() {
         runCatching {
             val turno = repo.turnoAbierto()
-            _state.update { it.copy(turnoCaja = turno) }
-        }.onFailure {
-            // Conserva turno activo si fue abierto o simulado
-            if (_state.value.turnoCaja == null) {
-                _state.update { it.copy(turnoCaja = null) }
+            if (turno != null && turno.estado == "ABIERTO") {
+                _state.update { it.copy(turnoCaja = turno) }
             }
         }
     }
@@ -420,8 +417,8 @@ class PosViewModel(
         val s = _state.value
         val idMesa = idMesaOpt ?: s.pedido?.idMesa ?: s.mesa?.idMesa ?: s.cocina.find { it.idPedido == idPedido }?.idMesa
         val codigoTrabajador = s.sesion?.usuario?.codigoTrabajador
-        val listaBorradores = if (idMesa != null && codigoTrabajador != null) {
-            val nuevaLista = s.borradores.filterNot { it.idMesa == idMesa || it.idPedido == idPedido }
+        val listaBorradores = if (codigoTrabajador != null) {
+            val nuevaLista = s.borradores.filterNot { (idMesa != null && it.idMesa == idMesa) || it.idPedido == idPedido }
             store.guardar(codigoTrabajador, nuevaLista)
             nuevaLista
         } else s.borradores
@@ -435,7 +432,7 @@ class PosViewModel(
         _state.update {
             it.copy(
                 pedido = null,
-                mesa = if (it.mesa?.idMesa == idMesa) null else it.mesa,
+                mesa = null,
                 borrador = if (it.borrador?.idMesa == idMesa || it.borrador?.idPedido == idPedido) null else it.borrador,
                 borradores = listaBorradores,
                 mesas = mesasActualizadas,
@@ -444,9 +441,9 @@ class PosViewModel(
         }
     }
 
-    fun cobrarEfectivo(idPedido: Long, recibido: Double, total: Double) = task {
+    fun cobrarEfectivo(idPedido: Long, recibido: Double, total: Double, idMesaOpt: Long? = null) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
+        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
         runCatching {
             repo.cobrarEfectivo(idPedido, t.idTurno, recibido, total)
         }
@@ -459,9 +456,9 @@ class PosViewModel(
         if (_state.value.puedeMesas) cargarSalon()
     }
 
-    fun cobrarDigital(idPedido: Long, metodo: String, total: Double, operacion: String, ultimos4: String) = task {
+    fun cobrarDigital(idPedido: Long, metodo: String, total: Double, operacion: String, ultimos4: String, idMesaOpt: Long? = null) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
+        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
         runCatching {
             repo.cobrarDigital(idPedido, t.idTurno, metodo, total, operacion, ultimos4)
         }
@@ -472,9 +469,9 @@ class PosViewModel(
         if (_state.value.puedeMesas) cargarSalon()
     }
 
-    fun cobrarMixto(idPedido: Long, partes: List<Triple<String, Double, String?>>) = task {
+    fun cobrarMixto(idPedido: Long, partes: List<Triple<String, Double, String?>>, idMesaOpt: Long? = null) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
-        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
+        val idMesa = idMesaOpt ?: _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa ?: _state.value.cocina.find { it.idPedido == idPedido }?.idMesa
         runCatching {
             repo.cobrarMixto(idPedido, t.idTurno, partes)
         }

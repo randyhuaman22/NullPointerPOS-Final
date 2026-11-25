@@ -2,6 +2,7 @@
 
 package pe.edu.upeu.nullpointerpos.data.mapper
 
+import kotlinx.serialization.json.JsonPrimitive
 import pe.edu.upeu.nullpointerpos.domain.model.*
 import pe.edu.upeu.nullpointerpos.data.remote.dto.*
 
@@ -50,7 +51,7 @@ fun Linea.request() = DetalleRequest(idProducto, cantidad, observaciones)
 
 fun TurnoCajaResponse.dominio() = TurnoCaja(
     idTurno = idTurno,
-    cajero = cajero,
+    cajero = cajeroFinal,
     montoInicialCentimos = centimos(montoInicial.content),
     fechaApertura = fechaApertura,
     estado = estado
@@ -59,10 +60,10 @@ fun TurnoCajaResponse.dominio() = TurnoCaja(
 fun CierreCajaResponse.dominio() = CierreCajaInfo(
     idTurno = idTurno,
     montoInicialCentimos = centimos(montoInicial.content),
-    totalEfectivoEsperadoCentimos = centimos(totalEfectivoEsperado.content),
-    totalEfectivoRealCentimos = centimos(totalEfectivoReal.content),
-    diferenciaCentimos = centimos(diferencia.content),
-    fechaCierre = fechaCierre
+    totalEfectivoEsperadoCentimos = centimos((montoEsperado ?: totalEfectivoEsperado ?: totalEfectivo ?: JsonPrimitive("0.00")).content),
+    totalEfectivoRealCentimos = centimos((montoReal ?: totalEfectivoReal ?: JsonPrimitive("0.00")).content),
+    diferenciaCentimos = centimos((diferencia ?: JsonPrimitive("0.00")).content),
+    fechaCierre = fechaCierre ?: ""
 )
 
 fun InsumoDto.dominio() = Insumo(
