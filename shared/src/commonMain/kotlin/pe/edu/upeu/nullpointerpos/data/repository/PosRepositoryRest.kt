@@ -20,7 +20,25 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun productos() = api.productos().map { it.dominio() }
     override suspend fun todosProductos() = api.todosProductos().map { it.dominio() }
     override suspend fun crear(b: Borrador) =
-        api.crear(CrearPedidoRequest(b.idMesa, b.observaciones, b.lineas.map { it.request() })).dominio()
+        api.crear(CrearPedidoRequest(b.idMesa, b.observaciones, b.lineas.map { it.request() }, b.llaveIdempotencia.ifBlank { null })).dominio()
+
+    override suspend fun sincronizarPedidoOffline(
+        idMesa: Long,
+        observaciones: String,
+        lineas: List<Linea>,
+        idempotencia: String,
+        enviarACocina: Boolean,
+        fechaRegistroOffline: String?
+    ) = api.sincronizarPedidoOffline(
+        SincronizarPedidoOfflineRequest(
+            idMesa = idMesa,
+            observaciones = observaciones,
+            detalles = lineas.map { it.request() },
+            idempotencia = idempotencia,
+            enviarACocina = enviarACocina,
+            fechaRegistroOffline = fechaRegistroOffline
+        )
+    ).dominio()
 
     override suspend fun pedido(id: Long) = api.pedido(id).dominio()
     override suspend fun pedidosActivosSalon() = api.pedidosActivosSalon().map { it.dominio() }
@@ -43,6 +61,7 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     override suspend fun cocina() = api.cocina().map { it.dominio() }
     override fun eventosCocina() = socket.eventos()
     override suspend fun marcarPlatoListo(idDetalle: Long) = api.marcarPlatoListo(idDetalle)
+    override suspend fun marcarPedidoListoCocina(idPedido: Long) = api.marcarPedidoListoCocina(idPedido).dominio()
     override suspend fun cambiarDisponibilidad(idProducto: Long, disponible: Boolean) =
         api.cambiarDisponibilidad(idProducto, disponible)
 

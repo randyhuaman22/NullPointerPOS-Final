@@ -28,7 +28,22 @@ data class ProductoDto(
 data class DetalleRequest(val idProducto: Long, val cantidad: Int, val observaciones: String)
 
 @Serializable
-data class CrearPedidoRequest(val idMesa: Long, val observaciones: String, val detalles: List<DetalleRequest>)
+data class CrearPedidoRequest(
+    val idMesa: Long,
+    val observaciones: String,
+    val detalles: List<DetalleRequest>,
+    val idempotencia: String? = null
+)
+
+@Serializable
+data class SincronizarPedidoOfflineRequest(
+    val idMesa: Long,
+    val observaciones: String,
+    val detalles: List<DetalleRequest>,
+    val idempotencia: String,
+    val enviarACocina: Boolean = true,
+    val fechaRegistroOffline: String? = null
+)
 
 @Serializable
 data class EditarPedidoRequest(val detalles: List<DetalleRequest>)

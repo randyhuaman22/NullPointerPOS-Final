@@ -29,6 +29,7 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
             when (payload) {
                 is LoginRequest -> setBody(payload)
                 is CrearPedidoRequest -> setBody(payload)
+                is SincronizarPedidoOfflineRequest -> setBody(payload)
                 is EditarPedidoRequest -> setBody(payload)
                 is TrasladoRequest -> setBody(payload)
                 is CrearUsuarioRequest -> setBody(payload)
@@ -69,6 +70,8 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
     suspend fun productos(): List<ProductoDto> = call("menu/productos?soloDisponibles=true").body()
     suspend fun todosProductos(): List<ProductoDto> = call("menu/productos?soloDisponibles=false").body()
     suspend fun crear(b: CrearPedidoRequest): PedidoDto = call("pedidos", HttpMethod.Post, b).body()
+    suspend fun sincronizarPedidoOffline(b: SincronizarPedidoOfflineRequest): PedidoDto =
+        call("pedidos/sincronizar", HttpMethod.Post, b).body()
     suspend fun pedido(id: Long): PedidoDto = call("pedidos/$id").body()
     suspend fun pedidosActivosSalon(): List<PedidoDto> = call("pedidos/salon-activos").body()
     suspend fun pendientesCobro(): List<PedidoDto> = call("pedidos/pendientes-cobro").body()
@@ -87,6 +90,8 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
     suspend fun marcarPlatoListo(idDetalle: Long) {
         call("pedidos/detalle/$idDetalle", HttpMethod.Patch)
     }
+    suspend fun marcarPedidoListoCocina(idPedido: Long): PedidoDto =
+        call("pedidos/$idPedido/listo-cocina", HttpMethod.Patch).body()
     suspend fun resumenPago(idPedido: Long): ResumenPagoDto =
         call("pedidos/$idPedido/resumen-pago").body()
     suspend fun cambiarDisponibilidad(idProducto: Long, disponible: Boolean) {

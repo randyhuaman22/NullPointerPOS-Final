@@ -164,4 +164,63 @@ class ContratoApiTest {
             client.close()
         }
     }
+
+    @Test fun cacheYColaOfflinePersistenYSincronizanConBackend() = runTest {
+        val store = LocalStore(prefs).apply { servidor = "http://localhost:8080" }
+        val sesion = pe.edu.upeu.nullpointerpos.domain.model.Sesion(
+            token = "jwt-offline",
+            usuario = pe.edu.upeu.nullpointerpos.domain.model.Usuario(2L, "MOZ001", "Mozo Demo", "MOZO")
+        )
+        store.guardarUltimaSesion(sesion, store.huellaOffline("MOZ001", "1234"))
+        assertTrue(store.verificarPinOffline("moz001", "1234"))
+        assertFalse(store.verificarPinOffline("MOZ001", "0000"))
+
+        val accion = pe.edu.upeu.nullpointerpos.domain.model.AccionPendienteSync(
+            idLocal = "sync-1",
+            tipo = pe.edu.upeu.nullpointerpos.domain.model.TipoAccionSync.ENVIAR_PEDIDO_MOZO,
+            llaveIdempotencia = "PED-1-100",
+            descripcion = "Pedido M01",
+            idMesa = 1L,
+            codigoMesa = "M01",
+            lineas = listOf(pe.edu.upeu.nullpointerpos.domain.model.Linea(10L, "1/4 Pollo", 2200L, 2))
+        )
+        store.guardarColaSync("MOZ001", listOf(accion))
+        assertEquals("PED-1-100", store.colaSync("MOZ001").single().llaveIdempotencia)
+
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val engine = MockEngine { request ->
+            assertEquals("Bearer jwt", request.headers[HttpHeaders.Authorization])
+            when (request.url.encodedPath) {
+                "/api/v1/pedidos/sincronizar" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    respond(
+                        """{"idPedido":55,"codigoPedido":"NP-055","idMesa":1,"codigoMesa":"M01","codigoMozo":"MOZ001","estado":"ENVIADO_COCINA","importeTotal":44.00,"detalles":[{"idDetallePedido":9,"idProducto":10,"nombreProducto":"1/4 Pollo","cantidad":2,"precioUnitario":22.00,"estado":"PENDIENTE"}]}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+                "/api/v1/pedidos/55/listo-cocina" -> {
+                    assertEquals(HttpMethod.Patch, request.method)
+                    respond(
+                        """{"idPedido":55,"codigoPedido":"NP-055","idMesa":1,"codigoMesa":"M01","codigoMozo":"MOZ001","estado":"LISTO","importeTotal":44.00,"detalles":[{"idDetallePedido":9,"idProducto":10,"nombreProducto":"1/4 Pollo","cantidad":2,"precioUnitario":22.00,"estado":"LISTO"}]}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+                else -> error("Ruta inesperada: ${request.url.encodedPath}")
+            }
+        }
+        val client = HttpClient(engine) { install(ContentNegotiation) { json(jsonParser) } }
+        val session = SessionContext().apply { token = "jwt" }
+        try {
+            val api = PosApi(client, store, session)
+            val repo = pe.edu.upeu.nullpointerpos.data.repository.PosRepositoryRest(api, CocinaSocket(api))
+            val sync = repo.sincronizarPedidoOffline(1L, "Sin ají", accion.lineas, "PED-1-100", true, "2026-11-25T15:50:00-05:00")
+            assertEquals("ENVIADO_COCINA", sync.estado)
+            assertEquals(55L, sync.idPedido)
+
+            val listo = repo.marcarPedidoListoCocina(55L)
+            assertEquals("LISTO", listo.estado)
+        } finally {
+            client.close()
+        }
+    }
 }

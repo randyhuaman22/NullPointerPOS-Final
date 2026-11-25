@@ -10,6 +10,8 @@ expect fun motorHttp(): HttpClientEngine
 expect fun servidorInicial(): String
 expect fun avisarPedido()
 expect fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean = false): String?
+expect fun hayConexionRed(): Boolean
+expect fun observarConectividad(onCambio: (Boolean) -> Unit): () -> Unit
 
 @Composable
 expect fun WendysLogo(modifier: Modifier = Modifier)

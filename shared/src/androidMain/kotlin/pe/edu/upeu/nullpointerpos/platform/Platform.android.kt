@@ -77,6 +77,41 @@ actual fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boo
     }
 }
 
+actual fun hayConexionRed(): Boolean {
+    if (!::androidContext.isInitialized) return true
+    return runCatching {
+        val cm = androidContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return true
+        val active = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(active) ?: return false
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }.getOrDefault(true)
+}
+
+actual fun observarConectividad(onCambio: (Boolean) -> Unit): () -> Unit {
+    if (!::androidContext.isInitialized) return {}
+    val cm = androidContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        ?: return {}
+    val mainHandler = Handler(Looper.getMainLooper())
+    val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            mainHandler.post { onCambio(true) }
+        }
+        override fun onLost(network: android.net.Network) {
+            mainHandler.post { onCambio(hayConexionRed()) }
+        }
+        override fun onCapabilitiesChanged(network: android.net.Network, networkCapabilities: android.net.NetworkCapabilities) {
+            val ok = networkCapabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            mainHandler.post { onCambio(ok) }
+        }
+    }
+    return runCatching<() -> Unit> {
+        cm.registerDefaultNetworkCallback(callback)
+        val cancelar: () -> Unit = { runCatching { cm.unregisterNetworkCallback(callback) } }
+        cancelar
+    }.getOrDefault({})
+}
+
 @Composable
 actual fun WendysLogo(modifier: Modifier) {
     val bitmap = remember {

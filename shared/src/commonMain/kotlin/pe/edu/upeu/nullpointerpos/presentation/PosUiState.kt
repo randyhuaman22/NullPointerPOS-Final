@@ -13,6 +13,9 @@ data class PosUiState(
     val pagina: String = "Salón",
     val modoOscuro: Boolean = false,
     val pendientesEmision: List<pe.edu.upeu.nullpointerpos.data.remote.dto.SolicitudEmitirComprobante> = emptyList(),
+    val conectadoServidor: Boolean = true,
+    val sincronizandoCola: Boolean = false,
+    val colaSync: List<AccionPendienteSync> = emptyList(),
 
     // Salón y Menú
     val mesas: List<Mesa> = emptyList(),

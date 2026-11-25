@@ -25,6 +25,8 @@ actual fun servidorInicial() = "http://localhost:8080"
 actual fun avisarPedido() { AudioServicesPlaySystemSound(1007u) }
 actual fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean): String? =
     "Vista/descarga directa de PDF disponible en Android."
+actual fun hayConexionRed(): Boolean = true
+actual fun observarConectividad(onCambio: (Boolean) -> Unit): () -> Unit = {}
 
 @Composable
 actual fun WendysLogo(modifier: Modifier) {

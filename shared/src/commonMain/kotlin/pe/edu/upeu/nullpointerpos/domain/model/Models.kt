@@ -12,6 +12,7 @@ data class Usuario(
     val rol: String
 )
 
+@Serializable
 data class Sesion(
     val token: String,
     val usuario: Usuario
@@ -35,6 +36,7 @@ data class Categoria(
     val ordenVisualizacion: Int = 0
 )
 
+@Serializable
 data class Producto(
     val idProducto: Long,
     val nombre: String,
@@ -97,7 +99,8 @@ data class Borrador(
     val lineas: List<Linea> = emptyList(),
     val observaciones: String = "",
     val idPedido: Long? = null,
-    val creacionIncierta: Boolean = false
+    val creacionIncierta: Boolean = false,
+    val llaveIdempotencia: String = ""
 )
 
 // Modelos de Caja (Sprint 2 y 3)
@@ -219,6 +222,70 @@ data class AuditoriaRegistro(
             nombreEntidad
         }
 }
+
+@Serializable
+enum class TipoAccionSync {
+    ENVIAR_PEDIDO_MOZO,
+    MARCAR_PLATO_LISTO,
+    MARCAR_PEDIDO_LISTO,
+    CAMBIAR_DISPONIBILIDAD,
+    COBRAR_PEDIDO
+}
+
+@Serializable
+data class ParteCobroSync(
+    val metodo: String,
+    val importe: Double,
+    val operacion: String? = null
+)
+
+@Serializable
+data class AccionPendienteSync(
+    val idLocal: String,
+    val tipo: TipoAccionSync,
+    val llaveIdempotencia: String,
+    val descripcion: String,
+    val idMesa: Long? = null,
+    val codigoMesa: String = "",
+    val idPedidoLocal: Long? = null,
+    val idPedido: Long? = null,
+    val idDetalle: Long? = null,
+    val idProducto: Long? = null,
+    val disponible: Boolean? = null,
+    val observaciones: String = "",
+    val lineas: List<Linea> = emptyList(),
+    val enviarACocina: Boolean = true,
+    val fechaRegistroOffline: String? = null,
+    val idTurnoCaja: Long? = null,
+    val metodoPago: String? = null,
+    val recibidoEfectivo: Double = 0.0,
+    val totalPedido: Double = 0.0,
+    val operacionDigital: String = "",
+    val ultimos4Digital: String = "",
+    val partesMixto: List<ParteCobroSync> = emptyList(),
+    val emitirSunat: Boolean = false,
+    val tipoComprobante: String = "BOLETA",
+    val tipoDoc: String = "Sin Doc",
+    val numDoc: String = "",
+    val razonSocial: String = "",
+    val direccion: String = "",
+    val telefonoWhatsapp: String? = null,
+    val enviarWhatsapp: Boolean = false,
+    val ultimoError: String? = null
+)
+
+@Serializable
+data class SnapshotOffline(
+    val sesion: Sesion? = null,
+    val mesas: List<Mesa> = emptyList(),
+    val categorias: List<Categoria> = emptyList(),
+    val productos: List<Producto> = emptyList(),
+    val productosTodos: List<Producto> = emptyList(),
+    val pedidosSalon: List<Pedido> = emptyList(),
+    val cocina: List<Pedido> = emptyList(),
+    val pendientesCobro: List<Pedido> = emptyList(),
+    val turnoCaja: TurnoCaja? = null
+)
 
 fun dinero(centimos: Long): String {
     val signo = if (centimos < 0) "-" else ""

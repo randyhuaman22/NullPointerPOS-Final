@@ -16,6 +16,14 @@ interface PosRepository {
     suspend fun productos(): List<Producto>
     suspend fun todosProductos(): List<Producto>
     suspend fun crear(b: Borrador): Pedido
+    suspend fun sincronizarPedidoOffline(
+        idMesa: Long,
+        observaciones: String,
+        lineas: List<Linea>,
+        idempotencia: String,
+        enviarACocina: Boolean = true,
+        fechaRegistroOffline: String? = null
+    ): Pedido
     suspend fun pedido(id: Long): Pedido
     suspend fun pedidosActivosSalon(): List<Pedido>
     suspend fun pendientesCobro(): List<Pedido>
@@ -31,6 +39,7 @@ interface PosRepository {
     suspend fun cocina(): List<Pedido>
     fun eventosCocina(): Flow<Unit>
     suspend fun marcarPlatoListo(idDetalle: Long)
+    suspend fun marcarPedidoListoCocina(idPedido: Long): Pedido
     suspend fun cambiarDisponibilidad(idProducto: Long, disponible: Boolean)
 
     // Sprint 2 - Caja & Cobros

@@ -988,7 +988,12 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Box(Modifier.size(8.dp).clip(CircleShape).background(VerdeEsmeralda))
+                                val dotEstado = when {
+                                    !s.conectadoServidor -> RojoCoral
+                                    s.colaSync.isNotEmpty() || s.sincronizandoCola -> AmbarAlerta
+                                    else -> VerdeEsmeralda
+                                }
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(dotEstado))
                                 Text(s.rol, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (s.modoOscuro) AmbarDorado else Borgona)
                             }
                         }
@@ -1015,6 +1020,62 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                         Modifier.fillMaxWidth(),
                         color = if (s.modoOscuro) AmbarDorado else Borgona
                     )
+                }
+                AnimatedVisibility(
+                    visible = !s.conectadoServidor || s.colaSync.isNotEmpty() || s.sincronizandoCola,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    val cSync = LocalColores.current
+                    val tieneErrorSync = s.colaSync.any { !it.ultimoError.isNullOrBlank() }
+                    val bgSync = if (!s.conectadoServidor || tieneErrorSync) cSync.rojoBg else cSync.ambarBg
+                    val fgSync = if (!s.conectadoServidor || tieneErrorSync) RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = bgSync,
+                        border = BorderStroke(1.dp, fgSync.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(
+                                    if (!s.conectadoServidor) Icons.Default.CloudOff else Icons.Default.CloudUpload,
+                                    null,
+                                    tint = fgSync,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    val tituloSync = when {
+                                        s.sincronizandoCola -> "Sincronizando (${s.colaSync.size} pendientes)..."
+                                        !s.conectadoServidor -> "Sin conexión · ${s.colaSync.size} pendientes"
+                                        else -> "Conexión lista · ${s.colaSync.size} por sincronizar"
+                                    }
+                                    Text(tituloSync, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = fgSync)
+                                    val subtituloSync = s.colaSync.firstOrNull { !it.ultimoError.isNullOrBlank() }?.ultimoError
+                                        ?: if (!s.conectadoServidor) "Pedidos y cambios guardados localmente; se enviarán al volver la red."
+                                        else "Pulsa Sincronizar o espera un momento para actualizar los roles."
+                                    Text(subtituloSync, fontSize = 10.sp, color = cSync.textoSecundario, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                                TextButton(
+                                    onClick = vm::sincronizarAhora,
+                                    enabled = !s.sincronizandoCola
+                                ) {
+                                    if (s.sincronizandoCola) {
+                                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = fgSync)
+                                    } else {
+                                        Text("Sincronizar", fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, color = fgSync)
+                                    }
+                                }
+                            }
+                            s.colaSync.firstOrNull { !it.ultimoError.isNullOrBlank() }?.let { falloSync ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    TextButton(onClick = { vm.descartarAccionSync(falloSync.idLocal) }) {
+                                        Text("Descartar conflicto", fontSize = 11.sp, color = RojoCoral, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 AnimatedVisibility(
                     visible = s.error != null || s.mensaje != null,
@@ -1275,22 +1336,32 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
             ) {
                 gridItems(mesasFiltradas, key = { it.idMesa }) { mesa ->
                     val pedidoActivo = s.pedidosSalon.find { it.idMesa == mesa.idMesa } ?: s.cocina.find { it.idMesa == mesa.idMesa }
+                    val esPedidoOffline = pedidoActivo?.estado == "PEDIDO_POR_SINCRONIZAR"
+                    val esListoOffline = pedidoActivo?.estado == "LISTO_POR_SINCRONIZAR"
+                    val esListoCocina = pedidoActivo?.estado == "LISTO" || esListoOffline
                     val ocupadaServidor = mesa.estado != "LIBRE" || pedidoActivo != null
                     val borradorLocal = s.borradores.find { it.idMesa == mesa.idMesa }
                     val tieneBorradorLocal = !ocupadaServidor && borradorLocal != null && borradorLocal.lineas.isNotEmpty()
                     val libre = !ocupadaServidor && !tieneBorradorLocal
                     val consumoCentimos = pedidoActivo?.importeCentimos ?: borradorLocal?.lineas?.total() ?: 0L
                     val colorAcento = when {
+                        esPedidoOffline -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                        esListoCocina -> VerdeEsmeralda
                         ocupadaServidor -> RojoCoral
                         tieneBorradorLocal -> AmbarProfundo
                         else -> VerdeEsmeralda
                     }
                     val colorBgBadge = when {
+                        esPedidoOffline -> c.ambarBg
+                        esListoCocina -> c.verdeBg
                         ocupadaServidor -> c.rojoBg
                         tieneBorradorLocal -> c.ambarBg
                         else -> c.verdeBg
                     }
                     val textoEstado = when {
+                        esPedidoOffline -> "PEDIDO (SYNC)"
+                        esListoOffline -> "LISTO (SYNC)"
+                        esListoCocina -> "LISTO"
                         ocupadaServidor -> "OCUPADA"
                         tieneBorradorLocal -> "BORRADOR"
                         else -> "LIBRE"
@@ -1410,6 +1481,7 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                         Text(
                                             when {
                                                 libre -> "Mesa libre"
+                                                esPedidoOffline -> "Por sincronizar:"
                                                 tieneBorradorLocal -> "Borrador:"
                                                 else -> pedidoActivo?.codigoPedido ?: "Consumo:"
                                             },
@@ -1424,8 +1496,9 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                             fontWeight = FontWeight.ExtraBold,
                                             color = when {
                                                 libre -> VerdeEsmeralda
-                                                tieneBorradorLocal -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
-                                                else -> Borgona
+                                                esPedidoOffline || tieneBorradorLocal -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                                esListoCocina -> VerdeEsmeralda
+                                                else -> if (s.modoOscuro) AmbarDorado else Borgona
                                             }
                                         )
                                     }
@@ -1439,7 +1512,8 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = when {
                                             libre -> Borgona
-                                            tieneBorradorLocal -> AmbarProfundo
+                                            esPedidoOffline || tieneBorradorLocal -> AmbarProfundo
+                                            esListoCocina -> VerdeEsmeralda
                                             else -> RojoCoral
                                         }
                                     ),
@@ -1448,6 +1522,8 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                     Icon(
                                         when {
                                             libre -> Icons.Default.AddShoppingCart
+                                            esPedidoOffline -> Icons.Default.CloudUpload
+                                            esListoCocina -> Icons.Default.CheckCircle
                                             tieneBorradorLocal -> Icons.Default.EditNote
                                             else -> Icons.AutoMirrored.Filled.ReceiptLong
                                         },
@@ -1458,6 +1534,8 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                     Text(
                                         when {
                                             libre -> "Tomar Pedido"
+                                            esPedidoOffline -> "Pedido (Sync)"
+                                            esListoCocina -> "Listo · Ver"
                                             tieneBorradorLocal -> "Continuar"
                                             else -> "Ver Comanda"
                                         },
@@ -1804,10 +1882,20 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                     ) {
                         if (pedidoServidor != null) {
                             item {
+                                val esOfflinePedido = pedidoServidor.estado == "PEDIDO_POR_SINCRONIZAR"
+                                val esListoOffline = pedidoServidor.estado == "LISTO_POR_SINCRONIZAR"
+                                val colorCard = if (esOfflinePedido || esListoOffline) c.ambarBg else c.verdeBg
+                                val tintCard = if (esOfflinePedido || esListoOffline) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else VerdeEsmeralda
+                                val tituloEstado = when (pedidoServidor.estado) {
+                                    "PEDIDO_POR_SINCRONIZAR" -> "PEDIDO (POR SINCRONIZAR)"
+                                    "LISTO_POR_SINCRONIZAR" -> "LISTO EN COCINA (POR SINCRONIZAR)"
+                                    "LISTO" -> "Pedido Listo para Entregar"
+                                    else -> "Pedido Registrado en Servidor"
+                                }
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = c.verdeBg,
-                                    border = BorderStroke(1.dp, VerdeEsmeralda.copy(alpha = 0.4f)),
+                                    color = colorCard,
+                                    border = BorderStroke(1.dp, tintCard.copy(alpha = 0.4f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -1815,11 +1903,19 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column {
-                                            Text("Pedido Registrado en Servidor", fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
-                                            Text("Mozo: ${pedidoServidor.codigoMozo.orEmpty()} · Estado: ${pedidoServidor.estado}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(tituloEstado, fontWeight = FontWeight.Bold, color = tintCard)
+                                            Text(
+                                                "Mozo: ${pedidoServidor.codigoMozo.orEmpty()} · Estado: ${pedidoServidor.estado.replace('_', ' ')}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = c.textoSecundario
+                                            )
                                         }
-                                        Icon(Icons.Default.CloudDone, null, tint = VerdeEsmeralda)
+                                        Icon(
+                                            if (esOfflinePedido || esListoOffline) Icons.Default.CloudUpload else Icons.Default.CloudDone,
+                                            null,
+                                            tint = tintCard
+                                        )
                                     }
                                 }
                             }
@@ -1836,9 +1932,27 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(l.nombre, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), color = c.textoPrincipal)
-                                        Text(dinero(l.precioCentimos * l.cantidad), fontWeight = FontWeight.ExtraBold, color = Borgona, style = MaterialTheme.typography.titleMedium)
+                                        Text(dinero(l.precioCentimos * l.cantidad), fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona, style = MaterialTheme.typography.titleMedium)
                                     }
-                                    Text("${dinero(l.precioCentimos)} c/u", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text("${dinero(l.precioCentimos)} c/u", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                                        if (pedidoServidor != null) {
+                                            val estColor = when (l.estado) {
+                                                "LISTO", "ENTREGADO" -> VerdeEsmeralda
+                                                "LISTO_POR_SINCRONIZAR" -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                                else -> c.textoSecundario
+                                            }
+                                            Text(
+                                                when (l.estado) {
+                                                    "LISTO_POR_SINCRONIZAR" -> "LISTO (POR SINCRONIZAR)"
+                                                    else -> l.estado.replace('_', ' ')
+                                                },
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = estColor
+                                            )
+                                        }
+                                    }
 
                                     if (l.observaciones.isNotBlank()) {
                                         Surface(shape = RoundedCornerShape(8.dp), color = c.ambarBg) {
@@ -2365,7 +2479,8 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
 
                             // Lista de platos con botón táctil individual FUNCIONAL (idDetallePedido)
                             p.lineas.forEach { l ->
-                                val platoListo = l.estado == "LISTO"
+                                val platoListoSync = l.estado == "LISTO_POR_SINCRONIZAR"
+                                val platoListo = l.estado in listOf("LISTO", "LISTO_POR_SINCRONIZAR", "ENTREGADO")
                                 Row(
                                     Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -2373,14 +2488,14 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = if (platoListo) c.verdeBg else c.contenedor,
+                                        color = if (platoListoSync) c.ambarBg else if (platoListo) c.verdeBg else c.contenedor,
                                         modifier = Modifier.size(36.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Text(
                                                 "${l.cantidad}x",
                                                 fontWeight = FontWeight.ExtraBold,
-                                                color = if (platoListo) VerdeEsmeralda else if (s.modoOscuro) AmbarDorado else Borgona
+                                                color = if (platoListoSync) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else if (platoListo) VerdeEsmeralda else if (s.modoOscuro) AmbarDorado else Borgona
                                             )
                                         }
                                     }
@@ -2408,12 +2523,16 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                                         enabled = !s.busy && !platoListo && l.idDetalle != null,
                                         shape = RoundedCornerShape(10.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (platoListo) VerdeEsmeralda else Borgona,
-                                            disabledContainerColor = c.verdeBg
+                                            containerColor = if (platoListoSync) AmbarProfundo else if (platoListo) VerdeEsmeralda else Borgona,
+                                            disabledContainerColor = if (platoListoSync) c.ambarBg else c.verdeBg
                                         ),
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
-                                        if (platoListo) {
+                                        if (platoListoSync) {
+                                            Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(14.dp), tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Listo (Sync)", color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        } else if (platoListo) {
                                             Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = VerdeEsmeralda)
                                             Spacer(Modifier.width(4.dp))
                                             Text("Listo", color = VerdeEsmeralda, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -2421,6 +2540,19 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                                             Text("Listo ✓", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                         }
                                     }
+                                }
+                            }
+
+                            if (p.idPedido > 0 && listosCount < p.lineas.size) {
+                                OutlinedButton(
+                                    onClick = { vm.marcarPedidoListoCocina(p.idPedido) },
+                                    enabled = !s.busy,
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.DoneAll, null, modifier = Modifier.size(16.dp), tint = VerdeEsmeralda)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Marcar todo el pedido listo", fontWeight = FontWeight.Bold, color = VerdeEsmeralda, fontSize = 12.sp)
                                 }
                             }
 
@@ -2572,6 +2704,18 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.height(4.dp))
         Heading("Caja & Facturación Electrónica", "Apertura de turno, boletas, facturas y cobros multicanal")
+        s.colaSync.filter { it.tipo == TipoAccionSync.COBRAR_PEDIDO }.forEach { cobroPend ->
+            val acentoAmbar = if (s.modoOscuro) AmbarDorado else AmbarProfundo
+            Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, acentoAmbar.copy(alpha = 0.4f))) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.CloudUpload, null, tint = acentoAmbar)
+                    Column(Modifier.weight(1f)) {
+                        Text("Cobro en cola (POR SINCRONIZAR)", fontWeight = FontWeight.Bold, color = acentoAmbar, fontSize = 13.sp)
+                        Text(cobroPend.descripcion, style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                    }
+                }
+            }
+        }
         s.pendientesEmision.forEach { solicitud ->
             Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
