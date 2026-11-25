@@ -483,47 +483,6 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                 )
             )
 
-            // Accesos Rápidos de demostración
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "Accesos rápidos de demostración:",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textoSecundario,
-                    fontSize = 11.sp
-                )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf(
-                        "Mozo" to "MOZ001",
-                        "Cajero" to "CAJ001",
-                        "Cocina" to "COC001",
-                        "Admin" to "ADM001"
-                    ).forEach { (rol, cod) ->
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = c.superficie,
-                            border = BorderStroke(1.dp, c.borde),
-                            modifier = Modifier.weight(1f).clickable {
-                                codigo = cod
-                                pin = "1234"
-                            }
-                        ) {
-                            Box(Modifier.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                                Text(
-                                    rol,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (codigo == cod) Borgona else c.textoSecundario,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             Spacer(Modifier.height(4.dp))
 
             // Indicador y botón rápido de Conexión de Red (IP del Servidor)
@@ -2522,39 +2481,53 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
             }
 
             // Mesas con cuenta activa (disponible para Cajero, Mozo y Administrador)
-            val mesasDisponibles = s.mesas.filter { it.estado == "OCUPADA" }.ifEmpty {
-                listOf(
-                    Mesa(1, "M-01", "Terraza", 4, "OCUPADA", false),
-                    Mesa(2, "M-02", "Terraza", 4, "OCUPADA", false),
-                    Mesa(3, "M-03", "Salón Princ.", 6, "OCUPADA", false),
-                    Mesa(5, "M-05", "Barra", 2, "OCUPADA", false)
-                )
-            }
-            Text("Mesas con Cuenta Activa:", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                items(mesasDisponibles) { mesa ->
-                    val seleccionada = (s.pedido?.idMesa == mesa.idMesa) || (pedidoSeleccionado?.codigoMesa == mesa.codigoMesa)
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (seleccionada) Borgona else c.superficie,
-                        border = BorderStroke(1.dp, if (seleccionada) Borgona else c.borde),
-                        modifier = Modifier.clickable {
-                            vm.recuperar(mesa.idMesa.toString())
-                            buscarPedidoId = mesa.idMesa.toString()
+            val mesasDisponibles = s.mesas.filter { it.estado == "OCUPADA" }
+            if (mesasDisponibles.isNotEmpty()) {
+                Text("Mesas con Cuenta Activa:", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    items(mesasDisponibles) { mesa ->
+                        val seleccionada = (s.pedido?.idMesa == mesa.idMesa) || (pedidoSeleccionado?.codigoMesa == mesa.codigoMesa)
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (seleccionada) Borgona else c.superficie,
+                            border = BorderStroke(1.dp, if (seleccionada) Borgona else c.borde),
+                            modifier = Modifier.clickable {
+                                vm.recuperar(mesa.idMesa.toString())
+                                buscarPedidoId = mesa.idMesa.toString()
+                            }
+                        ) {
+                            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                Text(
+                                    mesa.codigoMesa,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (seleccionada) BlancoPuro else c.textoPrincipal
+                                )
+                                Text(
+                                    mesa.nombreArea,
+                                    fontSize = 11.sp,
+                                    color = if (seleccionada) BlancoPuro.copy(alpha = 0.8f) else c.textoSecundario
+                                )
+                            }
                         }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = c.contenedor,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            Text(
-                                mesa.codigoMesa,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (seleccionada) BlancoPuro else c.textoPrincipal
-                            )
-                            Text(
-                                mesa.nombreArea,
-                                fontSize = 11.sp,
-                                color = if (seleccionada) BlancoPuro.copy(alpha = 0.8f) else c.textoSecundario
-                            )
-                        }
+                        Icon(Icons.Default.CheckCircle, null, tint = VerdeEsmeralda, modifier = Modifier.size(18.dp))
+                        Text(
+                            "Todas las mesas están libres. No hay cuentas pendientes de cobro.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = c.textoSecundario
+                        )
                     }
                 }
             }
