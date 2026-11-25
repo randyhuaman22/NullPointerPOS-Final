@@ -31,7 +31,7 @@ actual fun preferencias(): Preferencias = object : Preferencias {
     override fun guardar(clave: String, valor: String) { prefs.edit().putString(clave, valor).commit() }
 }
 actual fun motorHttp(): HttpClientEngine = OkHttp.create()
-actual fun servidorInicial() = "http://localhost:8080"
+actual fun servidorInicial() = "http://192.168.1.6:8080"
 actual fun avisarPedido() {
     runCatching { val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70); tone.startTone(ToneGenerator.TONE_PROP_ACK, 180); Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 400) }
 }

@@ -74,12 +74,16 @@ class PosViewModel(
     fun configurarServidor(value: String) {
         if (_state.value.sesion != null || _state.value.busy) return
         runCatching {
-            val url = Url(value.trim())
-            require(url.protocol.name in listOf("http", "https") && url.host.isNotBlank() && url.parameters.isEmpty()) {
-                "Usa solo la dirección del servidor: http://192.168.1.6:8080"
+            var raw = value.trim().trimEnd('/')
+            if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+                raw = "http://$raw"
             }
-            store.servidor = value.trim().trimEnd('/')
-            _state.update { it.copy(servidor = store.servidor, error = null, mensaje = "Servidor guardado correctamente") }
+            val url = Url(raw)
+            require(url.protocol.name in listOf("http", "https") && url.host.isNotBlank()) {
+                "Usa el formato: http://192.168.1.6:8080"
+            }
+            store.servidor = raw
+            _state.update { it.copy(servidor = raw, error = null, mensaje = "Servidor guardado: $raw") }
         }.onFailure { _state.update { s -> s.copy(error = it.message ?: "Dirección no válida") } }
     }
 

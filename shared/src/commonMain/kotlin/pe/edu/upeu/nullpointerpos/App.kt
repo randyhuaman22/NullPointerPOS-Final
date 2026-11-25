@@ -526,6 +526,33 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
 
             Spacer(Modifier.height(4.dp))
 
+            // Indicador y botón rápido de Conexión de Red (IP del Servidor)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = c.contenedor,
+                border = BorderStroke(1.dp, c.borde),
+                modifier = Modifier.fillMaxWidth().clickable {
+                    servidorTemp = s.servidor
+                    modalServidor = true
+                }
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(shape = CircleShape, color = VerdeEsmeralda, modifier = Modifier.size(8.dp)) {}
+                        Text("Servidor:", fontSize = 11.sp, color = c.textoSecundario)
+                        Text(s.servidor, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                    }
+                    Text("Cambiar IP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Borgona)
+                }
+            }
+
             // 3. Botón Principal de Ingreso al Turno
             Button(
                 onClick = { vm.login(codigo, pin); pin = "" },
@@ -579,9 +606,9 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(onClick = { servidorTemp = "http://localhost:8080" }, label = { Text("USB (localhost)") })
-                        SuggestionChip(onClick = { servidorTemp = "http://10.40.48.178:8080" }, label = { Text("Wi-Fi Actual (10.40.48.178)") })
-                        SuggestionChip(onClick = { servidorTemp = "http://192.168.1.6:8080" }, label = { Text("Wi-Fi Casa (192.168.1.6)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://192.168.1.6:8080" }, label = { Text("Wi-Fi PC (192.168.1.6)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://10.0.2.2:8080" }, label = { Text("Emulador (10.0.2.2)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://localhost:8080" }, label = { Text("USB / Localhost") })
                     }
                 }
             },

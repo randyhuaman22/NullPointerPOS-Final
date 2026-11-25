@@ -10,7 +10,9 @@ class LocalStore(private val prefs: Preferencias) {
     var servidor: String
         get() {
             val guardado = prefs.leer("servidor")
-            return if (guardado == null || guardado.contains("10.0.2.2")) pe.edu.upeu.nullpointerpos.platform.servidorInicial() else guardado
+            return if (guardado == null || guardado.contains("10.0.2.2") || guardado.contains("localhost")) {
+                pe.edu.upeu.nullpointerpos.platform.servidorInicial()
+            } else guardado
         }
         set(value) { prefs.guardar("servidor", value) }
     var modoOscuro: Boolean
