@@ -600,9 +600,10 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(onClick = { servidorTemp = "http://192.168.1.6:8080" }, label = { Text("Wi-Fi PC (192.168.1.6)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://localhost:8080" }, label = { Text("USB Cable (localhost)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://10.40.50.120:8080" }, label = { Text("Wi-Fi UPeU (10.40.50.120)") })
+                        SuggestionChip(onClick = { servidorTemp = "http://192.168.1.6:8080" }, label = { Text("Wi-Fi Casa (192.168.1.6)") })
                         SuggestionChip(onClick = { servidorTemp = "http://10.0.2.2:8080" }, label = { Text("Emulador (10.0.2.2)") })
-                        SuggestionChip(onClick = { servidorTemp = "http://localhost:8080" }, label = { Text("USB / Localhost") })
                     }
                 }
             },

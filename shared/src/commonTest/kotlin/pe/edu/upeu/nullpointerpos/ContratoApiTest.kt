@@ -80,4 +80,13 @@ class ContratoApiTest {
         assertEquals("", aud.motivo)
         assertEquals("1", aud.usuario)
     }
+    @Test fun localStoreRespetaLocalhostYIpPersonalizada() {
+        val store = LocalStore(prefs)
+        store.servidor = "http://localhost:8080"
+        assertEquals("http://localhost:8080", store.servidor)
+        store.servidor = "http://10.0.2.2:8080"
+        assertEquals("http://10.0.2.2:8080", store.servidor)
+        store.servidor = "http://10.40.50.120:8080"
+        assertEquals("http://10.40.50.120:8080", store.servidor)
+    }
 }
