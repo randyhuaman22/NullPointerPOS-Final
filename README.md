@@ -93,3 +93,8 @@ La configuración HTTP local está habilitada en ambas plataformas para este bac
 - `docs/VERIFICACION.md`: comprobaciones realizadas y límites de validación.
 
 No se han cambiado los archivos originales del backend ni del Excel.
+ 
+  
+  
+  
+ 
