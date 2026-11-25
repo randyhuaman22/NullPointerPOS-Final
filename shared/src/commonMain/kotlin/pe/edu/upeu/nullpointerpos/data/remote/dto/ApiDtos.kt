@@ -205,9 +205,17 @@ data class ClienteDto(
     val nombreCompleto: String? = null,
     val direccion: String? = null,
     val correo: String? = null,
-    val telefono: String? = null
+    val telefono: String? = null,
+    val estado: String? = null,
+    val estadoSunat: String? = null,
+    val condicion: String? = null,
+    val condicionSunat: String? = null,
+    val origenDatos: String? = null,
+    val mensaje: String? = null
 ) {
-    val razonSocialFinal: String get() = razonSocial?.ifBlank { null } ?: nombreCompleto?.ifBlank { null } ?: "CLIENTE DE PRUEBA"
+    val razonSocialFinal: String get() = razonSocial?.ifBlank { null } ?: nombreCompleto?.ifBlank { null }.orEmpty()
+    val estadoFinal: String get() = estadoSunat?.ifBlank { null } ?: estado?.ifBlank { null }.orEmpty()
+    val condicionFinal: String get() = condicionSunat?.ifBlank { null } ?: condicion?.ifBlank { null }.orEmpty()
 }
 
 @Serializable

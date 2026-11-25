@@ -119,7 +119,10 @@ data class ClienteDoc(
     val numeroDocumento: String,
     val razonSocial: String,
     val direccion: String? = null,
-    val condicion: String = "HABIDO"
+    val condicion: String = "",
+    val estadoSunat: String = "",
+    val origenDatos: String = "",
+    val mensaje: String = ""
 ) {
     val nombreCompleto: String get() = razonSocial
 }

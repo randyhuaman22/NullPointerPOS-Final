@@ -91,7 +91,16 @@ class PosRepositoryRest(private val api: PosApi, private val socket: CocinaSocke
     // --- SPRINT 3 ---
     override suspend fun buscarCliente(tipo: String, numero: String): ClienteDoc? {
         val res = api.buscarCliente(tipo.trim().uppercase(), numero.trim()) ?: return null
-        return ClienteDoc(res.tipoDocumento, res.numeroDocumento, res.razonSocialFinal, res.direccion)
+        return ClienteDoc(
+            tipoDocumento = res.tipoDocumento,
+            numeroDocumento = res.numeroDocumento,
+            razonSocial = res.razonSocialFinal,
+            direccion = res.direccion,
+            condicion = res.condicionFinal,
+            estadoSunat = res.estadoFinal,
+            origenDatos = res.origenDatos.orEmpty(),
+            mensaje = res.mensaje.orEmpty()
+        )
     }
 
     override suspend fun guardarCliente(cliente: ClienteDoc) {

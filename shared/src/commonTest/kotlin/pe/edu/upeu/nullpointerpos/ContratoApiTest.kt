@@ -136,4 +136,32 @@ class ContratoApiTest {
             client.close()
         }
     }
+
+    @Test fun consultaClienteApisperuMapeaEstadoCondicionYOrigen() = runTest {
+        val jsonParser = Json { ignoreUnknownKeys = true }
+        val engine = MockEngine { request ->
+            assertEquals("/api/v1/clientes/RUC/20131312955", request.url.encodedPath)
+            assertEquals("Bearer jwt", request.headers[HttpHeaders.Authorization])
+            respond(
+                """{"tipoDocumento":"RUC","numeroDocumento":"20131312955","nombreCompleto":"SUNAT DEMO S.A.C.","razonSocial":"SUNAT DEMO S.A.C.","direccion":"AV. GARCILASO 1472","estadoSunat":"ACTIVO","condicionSunat":"HABIDO","origenDatos":"APISPERU","mensaje":"Datos verificados automáticamente vía APISPERU."}""",
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val client = HttpClient(engine) { install(ContentNegotiation) { json(jsonParser) } }
+        val store = LocalStore(prefs).apply { servidor = "http://localhost:8080" }
+        val session = SessionContext().apply { token = "jwt" }
+        try {
+            val api = PosApi(client, store, session)
+            val repo = pe.edu.upeu.nullpointerpos.data.repository.PosRepositoryRest(api, CocinaSocket(api))
+            val cli = repo.buscarCliente("ruc", "20131312955")
+            assertNotNull(cli)
+            assertEquals("SUNAT DEMO S.A.C.", cli.razonSocial)
+            assertEquals("AV. GARCILASO 1472", cli.direccion)
+            assertEquals("ACTIVO", cli.estadoSunat)
+            assertEquals("HABIDO", cli.condicion)
+            assertEquals("APISPERU", cli.origenDatos)
+        } finally {
+            client.close()
+        }
+    }
 }

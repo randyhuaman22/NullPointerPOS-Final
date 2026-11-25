@@ -38,6 +38,8 @@ data class PosUiState(
     val turnoCaja: TurnoCaja? = null,
     val cierreInfo: CierreCajaInfo? = null,
     val clienteSeleccionado: ClienteDoc? = null,
+    val buscandoCliente: Boolean = false,
+    val clienteAviso: String? = null,
     val transaccionTarjeta: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaSimuladorTarjeta? = null,
     val comprobanteEmitido: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat? = null,
     val whatsappResultado: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto? = null,

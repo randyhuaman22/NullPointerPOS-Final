@@ -2528,8 +2528,27 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
 
     LaunchedEffect(s.clienteSeleccionado) {
         s.clienteSeleccionado?.let { cli ->
-            if (cli.razonSocial.isNotBlank()) razonSocialCliente = cli.razonSocial
-            if (!cli.direccion.isNullOrBlank()) direccionCliente = cli.direccion
+            if (cli.tipoDocumento.equals(tipoDoc, ignoreCase = true) && cli.numeroDocumento == numDoc) {
+                if (cli.razonSocial.isNotBlank()) razonSocialCliente = cli.razonSocial
+                if (!cli.direccion.isNullOrBlank()) direccionCliente = cli.direccion
+            }
+        }
+    }
+
+    LaunchedEffect(tipoDoc, numDoc) {
+        val largoRequerido = when (tipoDoc) {
+            "DNI" -> 8
+            "RUC" -> 11
+            else -> 0
+        }
+        if (largoRequerido > 0 && numDoc.length == largoRequerido) {
+            val yaCargado = s.clienteSeleccionado?.let {
+                it.tipoDocumento.equals(tipoDoc, ignoreCase = true) && it.numeroDocumento == numDoc
+            } == true
+            if (!yaCargado) {
+                kotlinx.coroutines.delay(280)
+                vm.buscarCliente(tipoDoc, numDoc)
+            }
         }
     }
 
@@ -2538,6 +2557,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
         razonSocialCliente = ""
         direccionCliente = ""
         efectivoRecibido = ""
+        enviarWhatsApp = false
+        telefonoWhatsApp = ""
+        vm.limpiarCliente()
     }
 
     // Descuento y Anulación Modal State
@@ -2843,6 +2865,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                         numDoc = ""
                                         razonSocialCliente = ""
                                         direccionCliente = ""
+                                        vm.limpiarCliente()
                                     },
                                     label = { Text(if (t == "RUC") "RUC (Factura)" else if (t == "DNI") "DNI (Boleta)" else "Boleta Sin Doc") }
                                 )
@@ -2853,7 +2876,17 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     value = numDoc,
-                                    onValueChange = { numDoc = it.filter(Char::isDigit).take(largoRequerido) },
+                                    onValueChange = {
+                                        val filtrado = it.filter(Char::isDigit).take(largoRequerido)
+                                        if (filtrado != numDoc) {
+                                            if (s.clienteSeleccionado != null) {
+                                                razonSocialCliente = ""
+                                                direccionCliente = ""
+                                            }
+                                            numDoc = filtrado
+                                            vm.limpiarCliente()
+                                        }
+                                    },
                                     label = { Text("Número de $tipoDoc ($largoRequerido dígitos)") },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2862,17 +2895,109 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 )
                                 Button(
                                     onClick = { vm.buscarCliente(tipoDoc, numDoc) },
-                                    enabled = !s.busy && numDoc.length == largoRequerido,
+                                    enabled = !s.busy && !s.buscandoCliente && numDoc.length == largoRequerido,
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Borgona)
-                                ) { Text("Validar") }
+                                ) {
+                                    if (s.buscandoCliente) {
+                                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                                    } else {
+                                        Text("Validar")
+                                    }
+                                }
                             }
-                            s.clienteSeleccionado?.let { cliente ->
-                                Surface(shape = RoundedCornerShape(8.dp), color = c.verdeBg, modifier = Modifier.fillMaxWidth()) {
+                            AnimatedVisibility(visible = s.clienteSeleccionado != null) {
+                                s.clienteSeleccionado?.let { cliente ->
+                                    val esRuc = cliente.tipoDocumento.equals("RUC", ignoreCase = true)
+                                    val tieneAlertaSunat = esRuc && (
+                                        (cliente.condicion.isNotBlank() && !cliente.condicion.equals("HABIDO", ignoreCase = true)) ||
+                                        (cliente.estadoSunat.isNotBlank() && !cliente.estadoSunat.equals("ACTIVO", ignoreCase = true))
+                                    )
+                                    val cardBg = if (tieneAlertaSunat) c.ambarBg else c.verdeBg
+                                    val cardTint = if (tieneAlertaSunat) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else VerdeEsmeralda
+                                    val origenLabel = when (cliente.origenDatos.uppercase()) {
+                                        "APISPERU" -> "APISPERU"
+                                        "DECOLECTA" -> "DECOLECTA"
+                                        "REGISTRO_LOCAL" -> "BD LOCAL"
+                                        "DEMO_LOCAL" -> "DEMO"
+                                        else -> if (esRuc) "SUNAT" else "RENIEC"
+                                    }
+                                    val subtituloEstado = when {
+                                        esRuc && (cliente.estadoSunat.isNotBlank() || cliente.condicion.isNotBlank()) ->
+                                            listOf(cliente.estadoSunat, cliente.condicion).filter { it.isNotBlank() }.joinToString(" · ")
+                                        cliente.origenDatos.equals("DEMO_LOCAL", ignoreCase = true) ->
+                                            "Datos ficticios de demostración"
+                                        cliente.origenDatos.equals("REGISTRO_LOCAL", ignoreCase = true) ->
+                                            "Cliente guardado en base local"
+                                        else ->
+                                            if (esRuc) "SUNAT verificado" else "RENIEC verificado"
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = cardBg,
+                                        border = BorderStroke(1.dp, cardTint.copy(alpha = 0.35f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    if (tieneAlertaSunat) Icons.Default.Warning else Icons.Default.Verified,
+                                                    null,
+                                                    tint = cardTint,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(
+                                                    cliente.razonSocial,
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = c.textoPrincipal,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = cardTint.copy(alpha = 0.16f)
+                                                ) {
+                                                    Text(
+                                                        origenLabel,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = cardTint,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                subtituloEstado,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = cardTint
+                                            )
+                                            if (!cliente.direccion.isNullOrBlank()) {
+                                                Text(
+                                                    cliente.direccion,
+                                                    fontSize = 11.sp,
+                                                    color = c.textoSecundario
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            AnimatedVisibility(visible = s.clienteSeleccionado == null && !s.clienteAviso.isNullOrBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = c.ambarBg,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
                                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Verified, null, tint = VerdeEsmeralda, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Info, null, tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("${cliente.razonSocial} · SUNAT HABIDO", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall, color = VerdeEsmeralda)
+                                        Text(
+                                            s.clienteAviso.orEmpty(),
+                                            fontSize = 11.sp,
+                                            color = if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                        )
                                     }
                                 }
                             }
@@ -3494,7 +3619,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(if (comp.estadoFinal == "ACEPTADO") Icons.Default.Verified else Icons.Default.ReceiptLong, null, modifier = Modifier.size(44.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
+                            Icon(if (comp.estadoFinal == "ACEPTADO") Icons.Default.Verified else Icons.AutoMirrored.Filled.ReceiptLong, null, modifier = Modifier.size(44.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
                             Text(comp.descripcionFinal, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal, textAlign = TextAlign.Center)
                             Text(if (comp.hashFinal.isBlank()) "Firma digital pendiente" else "Hash: ${comp.hashFinal.take(20)}…", fontSize = 10.sp, color = c.textoSecundario)
                         }

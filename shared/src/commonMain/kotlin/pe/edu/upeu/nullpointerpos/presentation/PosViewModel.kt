@@ -41,6 +41,7 @@ class PosViewModel(
     }
 
     private var kitchenJob: Job? = null
+    private var clienteJob: Job? = null
     private val kitchenLock = Mutex()
     private var cocinaIniciada = false
     private var idsCocina = emptySet<Long>()
@@ -717,6 +718,8 @@ class PosViewModel(
                 whatsappResultado = whatsappRes,
                 transaccionTarjeta = null,
                 clienteSeleccionado = null,
+                buscandoCliente = false,
+                clienteAviso = null,
                 mensaje = "$resumenCobro$avisoExtra"
             )
         }
@@ -842,10 +845,55 @@ class PosViewModel(
         _state.update { it.copy(comprobanteEmitido = null, whatsappResultado = null) }
     }
 
-    fun buscarCliente(tipo: String, numero: String) = task {
-        _state.update { it.copy(clienteSeleccionado = null) }
-        val cli = repo.buscarCliente(tipo, numero)
-        _state.update { it.copy(clienteSeleccionado = cli, mensaje = if (cli != null) "Cliente encontrado: ${cli.razonSocial}" else "No se encontraron datos del cliente") }
+    fun limpiarCliente() {
+        clienteJob?.cancel()
+        _state.update { it.copy(clienteSeleccionado = null, buscandoCliente = false, clienteAviso = null) }
+    }
+
+    fun buscarCliente(tipo: String, numero: String) {
+        val tipoNorm = tipo.trim().uppercase()
+        val numNorm = numero.trim()
+        clienteJob?.cancel()
+        _state.update { it.copy(clienteSeleccionado = null, buscandoCliente = true, clienteAviso = null, error = null) }
+        clienteJob = viewModelScope.launch {
+            try {
+                val cli = repo.buscarCliente(tipoNorm, numNorm)
+                if (cli != null) {
+                    val etiquetaOrigen = when (cli.origenDatos.uppercase()) {
+                        "APISPERU" -> "APISPERU"
+                        "DECOLECTA" -> "Decolecta"
+                        "REGISTRO_LOCAL" -> "BD local"
+                        "DEMO_LOCAL" -> "Demo local"
+                        else -> ""
+                    }
+                    val sufijo = if (etiquetaOrigen.isNotBlank()) " ($etiquetaOrigen)" else ""
+                    _state.update {
+                        it.copy(
+                            clienteSeleccionado = cli,
+                            clienteAviso = null,
+                            mensaje = "Cliente encontrado$sufijo: ${cli.razonSocial}"
+                        )
+                    }
+                } else {
+                    _state.update {
+                        it.copy(
+                            clienteSeleccionado = null,
+                            clienteAviso = "No registrado en padrón. Ingresa los datos manualmente (se guardarán para la próxima venta)."
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is FalloApi && e.codigo == 401) {
+                    fallo(e)
+                } else {
+                    _state.update { it.copy(clienteAviso = e.message ?: "No se pudo consultar el documento") }
+                }
+            } finally {
+                _state.update { it.copy(buscandoCliente = false) }
+            }
+        }
     }
 
     fun ticketWhatsApp(idPedido: Long, telefono: String) = task {
