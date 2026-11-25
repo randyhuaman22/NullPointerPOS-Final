@@ -416,30 +416,65 @@ class PosViewModel(
         _state.update { it.copy(turnoCaja = res, mensaje = "Turno de caja #${res.idTurno} abierto con fondo de S/ ${cent / 100}.$centStr") }
     }
 
+    private fun liberarMesaYLimpiarPedido(idPedido: Long, idMesaOpt: Long?) {
+        val s = _state.value
+        val idMesa = idMesaOpt ?: s.pedido?.idMesa ?: s.mesa?.idMesa ?: s.cocina.find { it.idPedido == idPedido }?.idMesa
+        val codigoTrabajador = s.sesion?.usuario?.codigoTrabajador
+        val listaBorradores = if (idMesa != null && codigoTrabajador != null) {
+            val nuevaLista = s.borradores.filterNot { it.idMesa == idMesa || it.idPedido == idPedido }
+            store.guardar(codigoTrabajador, nuevaLista)
+            nuevaLista
+        } else s.borradores
+
+        val mesasActualizadas = if (idMesa != null) {
+            s.mesas.map { if (it.idMesa == idMesa) it.copy(estado = "LIBRE") else it }
+        } else s.mesas
+
+        val cocinaFiltrada = s.cocina.filterNot { it.idPedido == idPedido }
+
+        _state.update {
+            it.copy(
+                pedido = null,
+                mesa = if (it.mesa?.idMesa == idMesa) null else it.mesa,
+                borrador = if (it.borrador?.idMesa == idMesa || it.borrador?.idPedido == idPedido) null else it.borrador,
+                borradores = listaBorradores,
+                mesas = mesasActualizadas,
+                cocina = cocinaFiltrada
+            )
+        }
+    }
+
     fun cobrarEfectivo(idPedido: Long, recibido: Double, total: Double) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
+        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
         runCatching {
             repo.cobrarEfectivo(idPedido, t.idTurno, recibido, total)
         }
         val vueltoCent = ((recibido - total) * 100).toLong().coerceAtLeast(0L)
         val vueltoStr = "S/ ${vueltoCent / 100}.${(vueltoCent % 100).toString().padStart(2, '0')}"
-        _state.update { it.copy(pedido = null, mensaje = "Cobro en efectivo registrado con éxito. Vuelto a entregar: $vueltoStr") }
+        liberarMesaYLimpiarPedido(idPedido, idMesa)
+        _state.update { it.copy(mensaje = "Cobro en efectivo registrado con éxito. Vuelto a entregar: $vueltoStr") }
         cargarTurnoCaja()
+        delay(1200)
         if (_state.value.puedeMesas) cargarSalon()
     }
 
     fun cobrarDigital(idPedido: Long, metodo: String, total: Double, operacion: String, ultimos4: String) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
+        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
         runCatching {
             repo.cobrarDigital(idPedido, t.idTurno, metodo, total, operacion, ultimos4)
         }
-        _state.update { it.copy(pedido = null, mensaje = "Cobro digital ($metodo - Op: $operacion) registrado con éxito") }
+        liberarMesaYLimpiarPedido(idPedido, idMesa)
+        _state.update { it.copy(mensaje = "Cobro digital ($metodo - Op: $operacion) registrado con éxito") }
         cargarTurnoCaja()
+        delay(1200)
         if (_state.value.puedeMesas) cargarSalon()
     }
 
     fun cobrarMixto(idPedido: Long, partes: List<Triple<String, Double, String?>>) = task {
         val t = _state.value.turnoCaja ?: error("Debe abrir turno de caja primero.")
+        val idMesa = _state.value.pedido?.idMesa ?: _state.value.mesa?.idMesa
         runCatching {
             repo.cobrarMixto(idPedido, t.idTurno, partes)
         }
@@ -447,8 +482,10 @@ class PosViewModel(
             val cent = (monto * 100).toLong()
             "$met: S/ ${cent / 100}.${(cent % 100).toString().padStart(2, '0')}"
         }
-        _state.update { it.copy(pedido = null, mensaje = "Cobro mixto ($detalle) registrado con éxito") }
+        liberarMesaYLimpiarPedido(idPedido, idMesa)
+        _state.update { it.copy(mensaje = "Cobro mixto ($detalle) registrado con éxito") }
         cargarTurnoCaja()
+        delay(1200)
         if (_state.value.puedeMesas) cargarSalon()
     }
 

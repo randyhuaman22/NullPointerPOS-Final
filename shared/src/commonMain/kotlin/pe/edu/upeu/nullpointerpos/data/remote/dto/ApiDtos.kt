@@ -160,13 +160,16 @@ data class CierreCajaResponse(
 
 @Serializable
 data class ClienteDto(
-    val tipoDocumento: String,
-    val numeroDocumento: String,
-    val razonSocial: String,
+    val tipoDocumento: String = "DNI",
+    val numeroDocumento: String = "",
+    val razonSocial: String? = null,
+    val nombreCompleto: String? = null,
     val direccion: String? = null,
     val correo: String? = null,
     val telefono: String? = null
-)
+) {
+    val razonSocialFinal: String get() = razonSocial?.ifBlank { null } ?: nombreCompleto?.ifBlank { null } ?: "CLIENTE DE PRUEBA"
+}
 
 @Serializable
 data class TicketWhatsAppRequest(
