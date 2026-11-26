@@ -20,11 +20,15 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
         path: String,
         method: HttpMethod = HttpMethod.Get,
         payload: Any? = null,
-        auth: Boolean = true
+        auth: Boolean = true,
+        accept: ContentType = ContentType.Application.Json
     ): HttpResponse {
         val response = client.request(url(path)) {
             this.method = method
-            contentType(ContentType.Application.Json)
+            if (accept == ContentType.Application.Json) {
+                contentType(ContentType.Application.Json)
+            }
+            accept(accept)
             if (auth) session.token?.let { bearerAuth(it) }
             when (payload) {
                 is LoginRequest -> setBody(payload)
@@ -139,7 +143,7 @@ class PosApi(val client: HttpClient, private val store: LocalStore, private val 
         call("tickets/whatsapp", HttpMethod.Post, b).body()
 
     suspend fun descargarPdfComprobante(idComprobante: Long): ByteArray =
-        call("comprobantes/$idComprobante/pdf").readBytes()
+        call("comprobantes/$idComprobante/pdf", accept = ContentType.Application.Pdf).readBytes()
 
     suspend fun aplicarDescuento(idPedido: Long, b: DescuentoPedidoRequest) {
         call("pedidos/$idPedido/descuento", HttpMethod.Patch, b)

@@ -23,7 +23,10 @@ import pe.edu.upeu.nullpointerpos.domain.model.*
 import pe.edu.upeu.nullpointerpos.domain.repository.FalloApi
 import pe.edu.upeu.nullpointerpos.domain.repository.PosRepository
 import pe.edu.upeu.nullpointerpos.platform.avisarPedido
+import pe.edu.upeu.nullpointerpos.platform.avisarPedidoListo
+import pe.edu.upeu.nullpointerpos.platform.destinosNotificacion
 import pe.edu.upeu.nullpointerpos.platform.hayConexionRed
+import pe.edu.upeu.nullpointerpos.platform.limpiarDestinoNotificacion
 import pe.edu.upeu.nullpointerpos.platform.observarConectividad
 
 class PosViewModel(
@@ -50,6 +53,10 @@ class PosViewModel(
     private var cocinaIniciada = false
     private var idsCocina = emptySet<Long>()
     private val idsNotificados = mutableSetOf<Long>()
+    private var notifListoJob: Job? = null
+    private var salonIniciado = false
+    private var estadosSalonPrevios = emptyMap<Long, String>()
+    private val idsListosNotificados = mutableSetOf<Long>()
 
     override fun onCleared() {
         unobserveRed?.invoke()
@@ -236,7 +243,7 @@ class PosViewModel(
             }
             val url = Url(raw)
             require(url.protocol.name in listOf("http", "https") && url.host.isNotBlank()) {
-                "Usa el formato: http://192.168.1.6:8080"
+                "Usa el formato: http://10.40.79.37:8080"
             }
             store.servidor = raw
             _state.update { it.copy(servidor = raw, error = null, mensaje = "Servidor guardado: $raw") }
@@ -344,8 +351,11 @@ class PosViewModel(
 
     fun cerrarSesion() {
         unobserveRed?.invoke(); unobserveRed = null
-        kitchenJob?.cancel(); kitchenJob = null; session.token = null
+        kitchenJob?.cancel(); kitchenJob = null
+        notifJob?.cancel(); notifListoJob?.cancel()
+        session.token = null
         cocinaIniciada = false; idsCocina = emptySet(); idsNotificados.clear()
+        salonIniciado = false; estadosSalonPrevios = emptyMap(); idsListosNotificados.clear()
         _state.value = PosUiState(servidor = store.servidor, modoOscuro = store.modoOscuro)
     }
 
@@ -374,6 +384,32 @@ class PosViewModel(
                 }
                 filtrados
             } else sActual.borradores
+
+            if (pedidosSalonRes.isSuccess) {
+                val estadosActuales = pedidosSalon.associate { it.idPedido to it.estado }
+                if (salonIniciado && sActual.puedeMesas) {
+                    val recienListos = pedidosSalon.filter { p ->
+                        p.estado == "LISTO" &&
+                            estadosSalonPrevios[p.idPedido] != "LISTO" &&
+                            p.idPedido !in idsListosNotificados
+                    }
+                    if (recienListos.isNotEmpty()) {
+                        recienListos.forEach { listo ->
+                            idsListosNotificados.add(listo.idPedido)
+                            val platos = listo.lineas.joinToString(", ") { "${it.cantidad}x ${it.nombre}" }
+                                .ifBlank { "Platos listos para servir" }
+                            avisarPedidoListo(
+                                titulo = "Pedido LISTO · Mesa ${listo.codigoMesa}",
+                                detalle = "${listo.codigoPedido} (${listo.codigoMozo}) · $platos",
+                                idPedido = listo.idPedido
+                            )
+                        }
+                        mostrarNotificacionPedidoListo(recienListos.first())
+                    }
+                }
+                estadosSalonPrevios = estadosActuales
+                salonIniciado = true
+            }
 
             val idsActivos = pedidosSalon.map { it.idPedido }.toSet()
             val mesaActualizada = sActual.mesa?.let { ma -> mesas.find { it.idMesa == ma.idMesa } ?: ma }
@@ -879,14 +915,20 @@ class PosViewModel(
             val pedidos = repo.cocina()
             val todos = runCatching { repo.todosProductos() }.getOrNull()
             val nuevosIds = pedidos.map { it.idPedido }.toSet()
-            val entrantes = nuevosIds - idsCocina
-            if (cocinaIniciada && _state.value.puedeCocina && entrantes.isNotEmpty() && entrantes.any { it !in idsNotificados }) {
-                avisarPedido()
+            val entrantes = (nuevosIds - idsCocina).filter { it !in idsNotificados }
+            if (cocinaIniciada && _state.value.puedeCocina && entrantes.isNotEmpty()) {
+                val nuevosPedidos = pedidos.filter { it.idPedido in entrantes }
                 idsNotificados.addAll(entrantes)
-                val nuevo = pedidos.firstOrNull { it.idPedido in entrantes }
-                if (nuevo != null) {
-                    mostrarNotificacionCocina(nuevo)
+                nuevosPedidos.forEach { nuevo ->
+                    val platos = nuevo.lineas.joinToString(", ") { "${it.cantidad}x ${it.nombre}" }
+                        .ifBlank { "Nueva comanda recibida" }
+                    avisarPedido(
+                        titulo = "Nuevo pedido en Cocina · Mesa ${nuevo.codigoMesa}",
+                        detalle = "${nuevo.codigoPedido} (${nuevo.codigoMozo}) · $platos",
+                        idPedido = nuevo.idPedido
+                    )
                 }
+                nuevosPedidos.firstOrNull()?.let { mostrarNotificacionCocina(it) }
             }
             idsCocina = nuevosIds
             cocinaIniciada = true
@@ -919,7 +961,7 @@ class PosViewModel(
         notifJob?.cancel()
         _state.update { it.copy(nuevoPedidoCocinaAviso = pedido) }
         notifJob = viewModelScope.launch {
-            delay(7000)
+            delay(9000)
             _state.update { it.copy(nuevoPedidoCocinaAviso = null) }
         }
     }
@@ -927,6 +969,20 @@ class PosViewModel(
     fun cerrarNotificacionCocina() {
         notifJob?.cancel()
         _state.update { it.copy(nuevoPedidoCocinaAviso = null) }
+    }
+
+    fun mostrarNotificacionPedidoListo(pedido: Pedido) {
+        notifListoJob?.cancel()
+        _state.update { it.copy(pedidoListoAviso = pedido) }
+        notifListoJob = viewModelScope.launch {
+            delay(9000)
+            _state.update { it.copy(pedidoListoAviso = null) }
+        }
+    }
+
+    fun cerrarNotificacionPedidoListo() {
+        notifListoJob?.cancel()
+        _state.update { it.copy(pedidoListoAviso = null) }
     }
 
     private fun iniciarMonitorRedYEventos() {
@@ -943,22 +999,40 @@ class PosViewModel(
         if (kitchenJob != null) return
         kitchenJob = viewModelScope.launch {
             launch {
+                destinosNotificacion().collect { destino ->
+                    limpiarDestinoNotificacion()
+                    val sActual = _state.value
+                    if (sActual.sesion != null) {
+                        if (destino == "Cocina" && sActual.puedeCocina) {
+                            navegar("Cocina")
+                        } else if (destino == "Salón" && sActual.puedeMesas) {
+                            navegar("Salón")
+                        }
+                    }
+                }
+            }
+            launch {
                 while (isActive) {
                     runCatching {
-                        socket.eventos().collect {
+                        repo.eventosCocina().collect {
                             _state.update { it.copy(socketConectado = true, conectadoServidor = true, cocinaAviso = null) }
                             sincronizarPendientes(silencioso = true)
                             recargarSegunPermisos()
                         }
                     }.onFailure { e ->
                         if (e is CancellationException) throw e
-                        _state.update { it.copy(socketConectado = false, cocinaAviso = "KDS: ${e.message}") }
+                        _state.update {
+                            it.copy(
+                                socketConectado = false,
+                                cocinaAviso = if (it.puedeCocina) "KDS: ${e.message}" else null
+                            )
+                        }
                         delay(5000)
                     }
                 }
             }
             while (isActive) {
-                delay(12000)
+                delay(if (_state.value.socketConectado) 12000 else 4000)
                 if (_state.value.colaSync.isNotEmpty() && hayConexionRed()) {
                     sincronizarPendientes(silencioso = true)
                 } else if (!_state.value.socketConectado && hayConexionRed()) {
@@ -1481,7 +1555,7 @@ class PosViewModel(
     }
 
     fun cerrarComprobanteModal() {
-        _state.update { it.copy(comprobanteEmitido = null, whatsappResultado = null) }
+        _state.update { it.copy(comprobanteEmitido = null, whatsappResultado = null, pdfVistaPrevia = null) }
     }
 
     fun limpiarCliente() {
@@ -1559,15 +1633,41 @@ class PosViewModel(
 
     fun abrirPdfComprobante(idComprobante: Long, numeroComprobante: String, compartir: Boolean = false) = task {
         val bytes = repo.descargarPdfComprobante(idComprobante)
+        if (bytes.isEmpty()) {
+            _state.update { it.copy(error = "El PDF del comprobante está vacío.") }
+            return@task
+        }
         val nombre = numeroComprobante.ifBlank { "Comprobante-$idComprobante" }
-        val error = pe.edu.upeu.nullpointerpos.platform.abrirPdfLocal(nombre, bytes, compartir)
-        if (error != null) {
-            _state.update { it.copy(error = error) }
+        if (compartir) {
+            val error = pe.edu.upeu.nullpointerpos.platform.abrirPdfLocal(nombre, bytes, compartir = true)
+            _state.update {
+                if (error != null) it.copy(error = error)
+                else it.copy(mensaje = "Compartiendo PDF $nombre...")
+            }
         } else {
             _state.update {
-                it.copy(mensaje = if (compartir) "Compartiendo PDF $nombre..." else "Abriendo PDF 80mm $nombre...")
+                it.copy(
+                    pdfVistaPrevia = PdfComprobanteUi(nombre = nombre, bytes = bytes),
+                    error = null
+                )
             }
         }
+    }
+
+    fun abrirPdfExterno(compartir: Boolean) {
+        val pdf = _state.value.pdfVistaPrevia ?: return
+        val error = pe.edu.upeu.nullpointerpos.platform.abrirPdfLocal(pdf.nombre, pdf.bytes, compartir)
+        _state.update {
+            if (error != null) it.copy(pdfVistaPrevia = null, error = error)
+            else it.copy(
+                error = null,
+                mensaje = if (compartir) "Compartiendo PDF ${pdf.nombre}..." else "Abriendo PDF 80mm ${pdf.nombre}..."
+            )
+        }
+    }
+
+    fun cerrarVistaPreviaPdf() {
+        _state.update { it.copy(pdfVistaPrevia = null) }
     }
 
     fun aplicarDescuento(idPedido: Long, porcentaje: Double, motivo: String) = task {

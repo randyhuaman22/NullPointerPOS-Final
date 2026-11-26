@@ -112,6 +112,11 @@ class ContratoApiTest {
                 }
                 "/api/v1/comprobantes/1/pdf" -> {
                     assertEquals(HttpMethod.Get, request.method)
+                    val acceptHeader = request.headers.getAll(HttpHeaders.Accept).orEmpty().joinToString(",")
+                    assertTrue(
+                        acceptHeader.contains("application/pdf", ignoreCase = true),
+                        "Se esperaba Accept con application/pdf, pero se recibió: $acceptHeader"
+                    )
                     respond(
                         content = pdfEsperado,
                         headers = headersOf(HttpHeaders.ContentType, "application/pdf")

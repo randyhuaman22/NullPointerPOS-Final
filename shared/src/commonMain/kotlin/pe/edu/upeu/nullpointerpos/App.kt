@@ -54,6 +54,7 @@ import kotlin.math.roundToLong
 import kotlin.time.Clock
 import org.koin.compose.viewmodel.koinViewModel
 import pe.edu.upeu.nullpointerpos.domain.model.*
+import pe.edu.upeu.nullpointerpos.platform.VisorPdfComprobante
 import pe.edu.upeu.nullpointerpos.platform.WendysLogo
 import pe.edu.upeu.nullpointerpos.presentation.*
 import pe.edu.upeu.nullpointerpos.theme.*
@@ -260,12 +261,110 @@ private fun Brand(compact: Boolean = false) {
 }
 
 @Composable
+private fun EstadoPill(
+    texto: String,
+    colorContenido: Color,
+    colorFondo: Color,
+    borde: Color = colorContenido.copy(alpha = 0.28f),
+    icono: ImageVector? = null,
+    dotColor: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = colorFondo,
+        border = BorderStroke(1.dp, borde),
+        modifier = modifier
+    ) {
+        Row(
+            Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (dotColor != null) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(dotColor))
+            } else if (icono != null) {
+                Icon(icono, contentDescription = null, modifier = Modifier.size(13.dp), tint = colorContenido)
+            }
+            Text(
+                texto,
+                style = MaterialTheme.typography.labelSmall.tabular(),
+                fontWeight = FontWeight.Bold,
+                color = colorContenido,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun KpiMetricCard(
+    etiqueta: String,
+    valor: String,
+    icono: ImageVector,
+    acentoColor: Color,
+    acentoFondo: Color,
+    modifier: Modifier = Modifier
+) {
+    val c = LocalColores.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    etiqueta.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textoSecundario,
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = acentoFondo,
+                    border = BorderStroke(1.dp, acentoColor.copy(alpha = 0.22f)),
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(icono, null, tint = acentoColor, modifier = Modifier.size(15.dp))
+                    }
+                }
+            }
+            Text(
+                valor,
+                style = MaterialTheme.typography.headlineSmall.tabular(),
+                fontWeight = FontWeight.ExtraBold,
+                color = acentoColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 private fun Notice(text: String, error: Boolean = false, onClose: (() -> Unit)? = null) {
     val c = LocalColores.current
     Surface(
         color = if (error) MaterialTheme.colorScheme.errorContainer else c.verdeBg,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, if (error) MaterialTheme.colorScheme.error.copy(alpha = 0.3f) else VerdeEsmeralda.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, if (error) MaterialTheme.colorScheme.error.copy(alpha = 0.35f) else c.verde.copy(alpha = 0.42f)),
+        shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -276,7 +375,7 @@ private fun Notice(text: String, error: Boolean = false, onClose: (() -> Unit)? 
             Icon(
                 if (error) Icons.Default.ErrorOutline else Icons.Default.CheckCircleOutline,
                 contentDescription = null,
-                tint = if (error) MaterialTheme.colorScheme.error else VerdeEsmeralda,
+                tint = if (error) MaterialTheme.colorScheme.error else c.verde,
                 modifier = Modifier.size(20.dp)
             )
             Text(
@@ -311,9 +410,14 @@ private fun Empty(title: String, text: String, icon: ImageVector = Icons.Default
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Surface(shape = CircleShape, color = c.contenedor, modifier = Modifier.size(64.dp)) {
+        Surface(
+            shape = CircleShape,
+            color = c.acentoSuave,
+            border = BorderStroke(1.dp, c.acento.copy(alpha = 0.22f)),
+            modifier = Modifier.size(64.dp)
+        ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(32.dp), tint = Borgona)
+                Icon(icon, null, Modifier.size(30.dp), tint = c.acento)
             }
         }
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
@@ -331,12 +435,14 @@ private fun Chips(opciones: List<String>, actual: String, cambiar: (String) -> U
     ) {
         items(opciones) { opcion ->
             val seleccionado = opcion == actual
-            val colorChip by animateColorAsState(if (seleccionado) Borgona else c.superficie, animationSpec = tween(180), label = "Filtro")
+            val colorChip by animateColorAsState(if (seleccionado) c.acento else MaterialTheme.colorScheme.surface, animationSpec = tween(180), label = "Filtro")
+            val bordeChip by animateColorAsState(if (seleccionado) c.acento else MaterialTheme.colorScheme.outlineVariant, animationSpec = tween(180), label = "FiltroBorde")
+            val textoChip = if (seleccionado) (if (c.esOscuro) Color(0xFF1A1205) else BlancoPuro) else c.textoPrincipal
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(999.dp),
                 color = colorChip,
-                border = BorderStroke(1.dp, if (seleccionado) Borgona else c.borde),
-                shadowElevation = if (seleccionado) 3.dp else 1.dp,
+                border = BorderStroke(1.dp, bordeChip),
+                shadowElevation = if (seleccionado) 3.dp else 0.dp,
                 modifier = Modifier.clickable { cambiar(opcion) }
             ) {
                 Text(
@@ -344,7 +450,7 @@ private fun Chips(opciones: List<String>, actual: String, cambiar: (String) -> U
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Medium,
-                    color = if (seleccionado) BlancoPuro else c.textoPrincipal
+                    color = textoChip
                 )
             }
         }
@@ -355,12 +461,14 @@ private fun Chips(opciones: List<String>, actual: String, cambiar: (String) -> U
 private fun Confirmar(title: String, text: String, cerrar: () -> Unit, aceptar: () -> Unit) {
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = { Text(text) },
         confirmButton = {
             Button(
                 onClick = aceptar,
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) { Text("Confirmar") }
         },
         dismissButton = {
@@ -478,18 +586,18 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                 placeholder = { Text("ej. MOZ001, CAJ001, ADM001") },
                 singleLine = true,
                 enabled = !s.busy,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Badge, null, tint = Borgona) },
+                leadingIcon = { Icon(Icons.Default.Badge, null, tint = c.acento) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Borgona,
-                    unfocusedBorderColor = c.borde,
-                    focusedLabelColor = Borgona,
+                    focusedBorderColor = c.acento,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = c.acento,
                     unfocusedLabelColor = c.textoSecundario,
                     focusedTextColor = c.textoPrincipal,
                     unfocusedTextColor = c.textoPrincipal,
-                    focusedContainerColor = c.superficie,
-                    unfocusedContainerColor = c.superficie
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
@@ -505,9 +613,9 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                 placeholder = { Text("••••") },
                 singleLine = true,
                 enabled = !s.busy,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Lock, null, tint = Borgona) },
+                leadingIcon = { Icon(Icons.Default.Lock, null, tint = c.acento) },
                 trailingIcon = {
                     IconButton(onClick = { mostrarPin = !mostrarPin }) {
                         Icon(
@@ -519,14 +627,14 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                 },
                 visualTransformation = if (mostrarPin) VisualTransformation.None else PasswordVisualTransformation(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Borgona,
-                    unfocusedBorderColor = c.borde,
-                    focusedLabelColor = Borgona,
+                    focusedBorderColor = c.acento,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = c.acento,
                     unfocusedLabelColor = c.textoSecundario,
                     focusedTextColor = c.textoPrincipal,
                     unfocusedTextColor = c.textoPrincipal,
-                    focusedContainerColor = c.superficie,
-                    unfocusedContainerColor = c.superficie
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.NumberPassword,
@@ -546,16 +654,16 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
 
             // Indicador y botón rápido de Conexión de Red (IP del Servidor)
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = c.contenedor,
-                border = BorderStroke(1.dp, c.borde),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth().clickable {
                     servidorTemp = s.servidor
                     modalServidor = true
                 }
             ) {
                 Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -567,7 +675,7 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                         Text("Servidor:", fontSize = 11.sp, color = c.textoSecundario)
                         Text(s.servidor, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                     }
-                    Text("Cambiar IP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Borgona)
+                    Text("Cambiar IP", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.acento)
                 }
             }
 
@@ -576,11 +684,11 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                 onClick = { vm.login(codigo, pin); pin = "" },
                 enabled = !s.busy && codigo.isNotBlank() && pin.length >= 4,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Borgona,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = BlancoPuro,
-                    disabledContainerColor = Borgona.copy(alpha = 0.4f),
+                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                     disabledContentColor = BlancoPuro.copy(alpha = 0.7f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 1.dp)
@@ -600,7 +708,7 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
             Text(
                 "Wendy's Food · NullPointer POS\nCélula G5 · UPeU",
                 style = MaterialTheme.typography.labelSmall,
-                color = c.textoSecundario.copy(alpha = 0.5f),
+                color = c.textoSecundario.copy(alpha = 0.55f),
                 textAlign = TextAlign.Center,
                 fontSize = 11.sp
             )
@@ -611,6 +719,7 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
     if (modalServidor) {
         AlertDialog(
             onDismissRequest = { modalServidor = false },
+            shape = RoundedCornerShape(16.dp),
             title = { Text("Conexión de Red", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -620,12 +729,12 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                         onValueChange = { servidorTemp = it },
                         label = { Text("Servidor") },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SuggestionChip(onClick = { servidorTemp = "http://10.40.79.37:8080" }, label = { Text("Wi-Fi Laptop (10.40.79.37)") })
                         SuggestionChip(onClick = { servidorTemp = "http://localhost:8080" }, label = { Text("USB Cable (localhost)") })
-                        SuggestionChip(onClick = { servidorTemp = "http://10.40.31.185:8080" }, label = { Text("Wi-Fi Lab (10.40.31.185)") })
                         SuggestionChip(onClick = { servidorTemp = "http://192.168.1.6:8080" }, label = { Text("Wi-Fi Casa (192.168.1.6)") })
                         SuggestionChip(onClick = { servidorTemp = "http://10.0.2.2:8080" }, label = { Text("Emulador (10.0.2.2)") })
                     }
@@ -637,7 +746,8 @@ private fun Login(s: PosUiState, vm: PosViewModel) {
                         vm.configurarServidor(servidorTemp)
                         modalServidor = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) { Text("Guardar") }
             },
             dismissButton = {
@@ -795,9 +905,14 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                 ) {
                     items(destinos) { (nombre, icono, desc) ->
                         val seleccionado = s.pagina == nombre || (nombre == "Salón" && s.pagina == "Mesas") || (nombre == "Almacén" && s.pagina == "Stock")
+                        val itemBg by animateColorAsState(
+                            if (seleccionado) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            animationSpec = tween(180),
+                            label = "DrawerItemBg"
+                        )
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = if (seleccionado) Borgona else Color.Transparent,
+                            color = itemBg,
                             modifier = Modifier.fillMaxWidth().clickable {
                                 scope.launch { drawerState.close() }
                                 vm.navegar(nombre)
@@ -811,8 +926,8 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                 Icon(
                                     icono,
                                     contentDescription = nombre,
-                                    tint = if (seleccionado) AmbarDorado else (if (s.modoOscuro) AmbarDorado else Borgona),
-                                    modifier = Modifier.size(24.dp)
+                                    tint = if (seleccionado) AmbarDorado else LocalColores.current.acento,
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 Column(Modifier.weight(1f)) {
                                     Text(
@@ -824,7 +939,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                     Text(
                                         desc,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (seleccionado) BlancoPuro.copy(alpha = 0.7f) else LocalColores.current.textoSecundario
+                                        color = if (seleccionado) BlancoPuro.copy(alpha = 0.78f) else LocalColores.current.textoSecundario
                                     )
                                 }
                                 if (nombre == "Salón") {
@@ -837,7 +952,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                             Text(
                                                 "$ocupadas",
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall,
+                                                style = MaterialTheme.typography.labelSmall.tabular(),
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (seleccionado) Borgona else RojoCoral
                                             )
@@ -849,15 +964,15 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                     }
                 }
 
-                HorizontalDivider(color = LocalColores.current.borde)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 // Pie del Drawer con Modo Oscuro, Salir y Servidor
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     // Switch de Modo Oscuro
                     Surface(
                         shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, LocalColores.current.borde),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth().clickable { vm.toggleModoOscuro() }
                     ) {
                         Row(
@@ -867,14 +982,14 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = if (s.modoOscuro) AmbarDorado.copy(alpha = 0.2f) else Borgona.copy(alpha = 0.1f),
+                                color = LocalColores.current.acentoSuave,
                                 modifier = Modifier.size(34.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         if (s.modoOscuro) Icons.Default.DarkMode else Icons.Default.LightMode,
                                         contentDescription = null,
-                                        tint = if (s.modoOscuro) AmbarDorado else Borgona,
+                                        tint = LocalColores.current.acento,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -899,7 +1014,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                     checkedThumbColor = AmbarDorado,
                                     checkedTrackColor = Borgona,
                                     uncheckedThumbColor = BlancoPuro,
-                                    uncheckedTrackColor = LocalColores.current.borde
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant
                                 )
                             )
                         }
@@ -909,9 +1024,9 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(VerdeEsmeralda))
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.conectadoServidor) VerdeEsmeralda else RojoCoral))
                         Text(
-                            s.servidor.ifBlank { "http://localhost:8080" },
+                            s.servidor.ifBlank { "http://10.40.79.37:8080" },
                             style = MaterialTheme.typography.labelSmall,
                             color = LocalColores.current.textoSecundario,
                             maxLines = 1,
@@ -926,7 +1041,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = RojoCoral),
                         border = BorderStroke(1.dp, RojoCoral.copy(alpha = 0.4f)),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth().height(44.dp)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, null, modifier = Modifier.size(18.dp))
@@ -939,73 +1054,70 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
     ) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, "Abrir menú lateral", tint = if (s.modoOscuro) AmbarDorado else Borgona, modifier = Modifier.size(28.dp))
-                        }
-                    },
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color.Transparent,
-                                shadowElevation = 2.dp
-                            ) {
-                                WendysLogo(Modifier.size(34.dp))
+                Column {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Default.Menu, "Abrir menú lateral", tint = LocalColores.current.acento, modifier = Modifier.size(28.dp))
                             }
-                            Column {
-                                Text(
-                                    s.pagina,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = if (s.modoOscuro) AmbarDorado else Borgona
-                                )
-                                Text(
-                                    "Wendy's Food POS",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (s.modoOscuro) TextoOscuroSecundario else AmbarProfundo,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = vm::toggleModoOscuro) {
-                            Icon(
-                                if (s.modoOscuro) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Cambiar modo oscuro",
-                                tint = if (s.modoOscuro) AmbarDorado else Borgona
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = LocalColores.current.contenedor,
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Row(
-                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val dotEstado = when {
-                                    !s.conectadoServidor -> RojoCoral
-                                    s.colaSync.isNotEmpty() || s.sincronizandoCola -> AmbarAlerta
-                                    else -> VerdeEsmeralda
+                        },
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Transparent,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    WendysLogo(Modifier.size(34.dp))
                                 }
-                                Box(Modifier.size(8.dp).clip(CircleShape).background(dotEstado))
-                                Text(s.rol, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (s.modoOscuro) AmbarDorado else Borgona)
+                                Column {
+                                    Text(
+                                        s.pagina,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = LocalColores.current.acento
+                                    )
+                                    Text(
+                                        "Wendy's Food POS",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (s.modoOscuro) TextoOscuroSecundario else AmbarProfundo,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
-                        }
-                        IconButton(
-                            onClick = vm::refrescar,
-                            enabled = !s.busy && s.pagina != "Cuenta"
-                        ) {
-                            Icon(Icons.Default.Refresh, "Actualizar", tint = if (s.modoOscuro) AmbarDorado else Borgona)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-                )
+                        },
+                        actions = {
+                            IconButton(onClick = vm::toggleModoOscuro) {
+                                Icon(
+                                    if (s.modoOscuro) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = "Cambiar modo oscuro",
+                                    tint = LocalColores.current.acento
+                                )
+                            }
+                            val dotEstado = when {
+                                !s.conectadoServidor -> RojoCoral
+                                s.colaSync.isNotEmpty() || s.sincronizandoCola -> AmbarAlerta
+                                else -> VerdeEsmeralda
+                            }
+                            EstadoPill(
+                                texto = s.rol,
+                                colorContenido = LocalColores.current.acento,
+                                colorFondo = MaterialTheme.colorScheme.surfaceContainerLow,
+                                borde = MaterialTheme.colorScheme.outlineVariant,
+                                dotColor = dotEstado,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            IconButton(
+                                onClick = vm::refrescar,
+                                enabled = !s.busy && s.pagina != "Cuenta"
+                            ) {
+                                Icon(Icons.Default.Refresh, "Actualizar", tint = LocalColores.current.acento)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                }
             }
         ) { padding ->
             Column(
@@ -1018,7 +1130,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                 ) {
                     LinearProgressIndicator(
                         Modifier.fillMaxWidth(),
-                        color = if (s.modoOscuro) AmbarDorado else Borgona
+                        color = LocalColores.current.acento
                     )
                 }
                 AnimatedVisibility(
@@ -1031,10 +1143,10 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                     val bgSync = if (!s.conectadoServidor || tieneErrorSync) cSync.rojoBg else cSync.ambarBg
                     val fgSync = if (!s.conectadoServidor || tieneErrorSync) RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = bgSync,
                         border = BorderStroke(1.dp, fgSync.copy(alpha = 0.35f)),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
                     ) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1050,7 +1162,7 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                                         !s.conectadoServidor -> "Sin conexión · ${s.colaSync.size} pendientes"
                                         else -> "Conexión lista · ${s.colaSync.size} por sincronizar"
                                     }
-                                    Text(tituloSync, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = fgSync)
+                                    Text(tituloSync, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge.tabular(), color = fgSync)
                                     val subtituloSync = s.colaSync.firstOrNull { !it.ultimoError.isNullOrBlank() }?.ultimoError
                                         ?: if (!s.conectadoServidor) "Pedidos y cambios guardados localmente; se enviarán al volver la red."
                                         else "Pulsa Sincronizar o espera un momento para actualizar los roles."
@@ -1084,6 +1196,132 @@ private fun Shell(s: PosUiState, vm: PosViewModel) {
                 ) {
                     Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         Notice(s.error ?: s.mensaje.orEmpty(), s.error != null, vm::limpiarAvisos)
+                    }
+                }
+                AnimatedVisibility(
+                    visible = s.pedidoListoAviso != null,
+                    enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                ) {
+                    s.pedidoListoAviso?.let { listo ->
+                        val cl = LocalColores.current
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = cl.azulBg,
+                            border = BorderStroke(2.dp, cl.azul),
+                            shadowElevation = 8.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .clickable {
+                                    vm.cerrarNotificacionPedidoListo()
+                                    if (s.pagina != "Salón") vm.navegar("Salón")
+                                }
+                        ) {
+                            Row(
+                                Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = cl.azul,
+                                    modifier = Modifier.size(42.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.NotificationsActive, null, tint = BlancoPuro, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            "¡PEDIDO LISTO PARA SERVIR!",
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 13.sp,
+                                            color = cl.azul
+                                        )
+                                        Surface(shape = RoundedCornerShape(6.dp), color = cl.azul) {
+                                            Text("LISTO", Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BlancoPuro)
+                                        }
+                                    }
+                                    Text(
+                                        "Mesa ${listo.codigoMesa} (${listo.codigoPedido}) · Ya puedes llevar los platos",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = cl.textoPrincipal
+                                    )
+                                    if (listo.lineas.isNotEmpty()) {
+                                        Text(
+                                            listo.lineas.joinToString(", ") { "${it.cantidad}x ${it.nombre}" }.take(65) + if (listo.lineas.size > 2) "..." else "",
+                                            fontSize = 11.sp,
+                                            color = cl.textoSecundario,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { vm.cerrarNotificacionPedidoListo() }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Default.Close, null, tint = cl.azul, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                AnimatedVisibility(
+                    visible = s.nuevoPedidoCocinaAviso != null && s.pagina != "Cocina",
+                    enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                ) {
+                    s.nuevoPedidoCocinaAviso?.let { nuevo ->
+                        val cl = LocalColores.current
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = cl.verdeBg,
+                            border = BorderStroke(2.dp, cl.verde),
+                            shadowElevation = 8.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .clickable {
+                                    vm.cerrarNotificacionCocina()
+                                    vm.navegar("Cocina")
+                                }
+                        ) {
+                            Row(
+                                Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = cl.verde,
+                                    modifier = Modifier.size(42.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.NotificationsActive, null, tint = BlancoPuro, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        "¡NUEVA COMANDA EN COCINA!",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp,
+                                        color = cl.verde
+                                    )
+                                    Text(
+                                        "Mesa ${nuevo.codigoMesa} (${nuevo.codigoPedido}) · ${nuevo.lineas.size} platos · Toca para abrir Cocina",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = cl.textoPrincipal,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                IconButton(onClick = { vm.cerrarNotificacionCocina() }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Default.Close, null, tint = cl.verde, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -1144,124 +1382,58 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            EstadoPill(
+                texto = if (s.socketConectado) "WebSocket En Vivo · Sincronizado" else "Conectado a ${s.servidor.removePrefix("http://").removePrefix("https://")}",
+                colorContenido = c.textoPrincipal,
+                colorFondo = MaterialTheme.colorScheme.surface,
+                borde = if (s.socketConectado) c.verde.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant,
+                dotColor = c.verde.copy(alpha = if (s.socketConectado) pulsoAlpha else 1f),
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Spacer(Modifier.width(8.dp))
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = c.superficie,
-                border = BorderStroke(1.dp, c.borde),
-                shadowElevation = 1.dp
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(VerdeEsmeralda.copy(alpha = if (s.socketConectado) pulsoAlpha else 1f))
-                    )
-                    Text(
-                        if (s.socketConectado) "WebSocket En Vivo · Sincronizado" else "Conectado a ${s.servidor.removePrefix("http://").removePrefix("https://")}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = c.textoPrincipal
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = c.contenedor,
+                shape = RoundedCornerShape(10.dp),
+                color = c.acentoSuave,
+                border = BorderStroke(1.dp, acento.copy(alpha = 0.25f)),
                 modifier = Modifier.clickable(enabled = !s.busy) { vm.refrescar() }
             ) {
                 Row(
                     Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Icon(Icons.Default.Refresh, null, modifier = Modifier.size(14.dp), tint = acento)
-                    Text("Sincronizar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = acento)
+                    Text("Sincronizar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = acento, maxLines = 1, softWrap = false)
                 }
             }
         }
 
-        // 2. Ticker Operativo Gastronómico (3 tarjetas estilo Google Stitch)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = c.superficie,
-                border = BorderStroke(1.dp, c.borde),
-                shadowElevation = 2.dp,
+        // 2. Ticker Operativo Gastronómico (3 tarjetas KPI con jerarquía visual M3)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            KpiMetricCard(
+                etiqueta = "Libres",
+                valor = totalLibres.toString().padStart(2, '0'),
+                icono = Icons.Default.EventAvailable,
+                acentoColor = c.verde,
+                acentoFondo = c.verdeBg,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(
-                    Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(VerdeEsmeralda))
-                        Text(
-                            totalLibres.toString().padStart(2, '0'),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = VerdeEsmeralda
-                        )
-                    }
-                    Text("Libres", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = c.superficie,
-                border = BorderStroke(1.dp, c.borde),
-                shadowElevation = 2.dp,
+            )
+            KpiMetricCard(
+                etiqueta = "Ocupadas",
+                valor = totalOcupadas.toString().padStart(2, '0'),
+                icono = Icons.Default.Restaurant,
+                acentoColor = RojoCoral,
+                acentoFondo = c.rojoBg,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(
-                    Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(RojoCoral))
-                        Text(
-                            totalOcupadas.toString().padStart(2, '0'),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = RojoCoral
-                        )
-                    }
-                    Text("Ocupadas", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = c.superficie,
-                border = BorderStroke(1.dp, c.borde),
-                shadowElevation = 2.dp,
+            )
+            KpiMetricCard(
+                etiqueta = "Total Salón",
+                valor = totalMesas.toString().padStart(2, '0'),
+                icono = Icons.Default.TableRestaurant,
+                acentoColor = if (s.modoOscuro) AmbarDorado else AmbarProfundo,
+                acentoFondo = c.ambarBg,
                 modifier = Modifier.weight(1f)
-            ) {
-                Column(
-                    Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(AmbarProfundo))
-                        Text(
-                            totalMesas.toString().padStart(2, '0'),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AmbarProfundo
-                        )
-                    }
-                    Text("Total Salón", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario, fontWeight = FontWeight.SemiBold)
-                }
-            }
+            )
         }
 
         // 3. Filtros de Áreas tipo Píldora
@@ -1270,10 +1442,20 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
             items(areas) { a ->
                 val activa = area == a
                 val cant = if (a == "Todo el Salón") s.mesas.size else s.mesas.count { it.nombreArea == a }
+                val areaBg by animateColorAsState(
+                    if (activa) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    animationSpec = tween(180),
+                    label = "AreaBg"
+                )
+                val areaBorder by animateColorAsState(
+                    if (activa) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    animationSpec = tween(180),
+                    label = "AreaBorder"
+                )
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (activa) Borgona else c.superficie,
-                    border = BorderStroke(1.dp, if (activa) Borgona else c.borde),
+                    shape = RoundedCornerShape(999.dp),
+                    color = areaBg,
+                    border = BorderStroke(1.dp, areaBorder),
                     shadowElevation = if (activa) 2.dp else 0.dp,
                     modifier = Modifier.clickable { area = a }
                 ) {
@@ -1284,13 +1466,13 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                     ) {
                         Text(
                             a,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (activa) FontWeight.Bold else FontWeight.Medium,
                             color = if (activa) BlancoPuro else c.textoPrincipal
                         )
                         Text(
                             "($cant)",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.tabular(),
                             fontWeight = FontWeight.Bold,
                             color = if (activa) AmbarDorado else c.textoSecundario
                         )
@@ -1300,21 +1482,36 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
         }
 
         // Filtro de Estado Rápido
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             listOf("Todas", "Libres", "Ocupadas").forEach { f ->
                 val sel = filtro == f
+                val fBg by animateColorAsState(
+                    if (sel) c.acentoSuave else Color.Transparent,
+                    animationSpec = tween(180),
+                    label = "EstadoFiltroBg"
+                )
+                val fBorder by animateColorAsState(
+                    if (sel) acento.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
+                    animationSpec = tween(180),
+                    label = "EstadoFiltroBorde"
+                )
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (sel) c.contenedor else Color.Transparent,
-                    border = BorderStroke(1.dp, if (sel) Borgona.copy(alpha = 0.5f) else c.borde.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(999.dp),
+                    color = fBg,
+                    border = BorderStroke(1.dp, fBorder),
                     modifier = Modifier.clickable { filtro = f }
                 ) {
                     Text(
                         f,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                        color = if (sel) Borgona else c.textoSecundario
+                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                        color = if (sel) acento else c.textoSecundario
                     )
                 }
             }
@@ -1346,14 +1543,14 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                     val consumoCentimos = pedidoActivo?.importeCentimos ?: borradorLocal?.lineas?.total() ?: 0L
                     val colorAcento = when {
                         esPedidoOffline -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
-                        esListoCocina -> VerdeEsmeralda
+                        esListoCocina -> c.azul
                         ocupadaServidor -> RojoCoral
-                        tieneBorradorLocal -> AmbarProfundo
-                        else -> VerdeEsmeralda
+                        tieneBorradorLocal -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                        else -> c.verde
                     }
                     val colorBgBadge = when {
                         esPedidoOffline -> c.ambarBg
-                        esListoCocina -> c.verdeBg
+                        esListoCocina -> c.azulBg
                         ocupadaServidor -> c.rojoBg
                         tieneBorradorLocal -> c.ambarBg
                         else -> c.verdeBg
@@ -1366,13 +1563,23 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                         tieneBorradorLocal -> "BORRADOR"
                         else -> "LIBRE"
                     }
+                    val mesaBorder by animateColorAsState(
+                        when {
+                            tieneBorradorLocal || esPedidoOffline -> colorAcento.copy(alpha = 0.55f)
+                            esListoCocina -> colorAcento.copy(alpha = 0.45f)
+                            ocupadaServidor -> colorAcento.copy(alpha = 0.30f)
+                            else -> MaterialTheme.colorScheme.outlineVariant
+                        },
+                        animationSpec = tween(220),
+                        label = "MesaBorde"
+                    )
 
-                    // Tarjeta de Mesa Estilo Google Stitch (Bistro & Gourmet)
+                    // Tarjeta de Mesa Estilo Bistro & Gourmet M3
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = c.superficie,
-                        border = BorderStroke(1.dp, if (tieneBorradorLocal) AmbarProfundo.copy(alpha = 0.5f) else c.borde),
-                        shadowElevation = 3.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, mesaBorder),
+                        shadowElevation = 2.dp,
                         modifier = Modifier.animateItem().fillMaxWidth().animateContentSize().clickable(enabled = !s.busy) { vm.abrir(mesa) }
                     ) {
                         Column {
@@ -1381,19 +1588,21 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                 Modifier.fillMaxWidth().height(5.dp).background(colorAcento)
                             )
 
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 // Cabecera: Código de Mesa y Badge de Estado
                                 Row(
                                     Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.Top
                                 ) {
-                                    Column {
+                                    Column(Modifier.weight(1f)) {
                                         Text(
                                             mesa.codigoMesa,
-                                            style = MaterialTheme.typography.titleLarge,
+                                            style = MaterialTheme.typography.titleLarge.tabular(),
                                             fontWeight = FontWeight.ExtraBold,
-                                            color = c.textoPrincipal
+                                            color = c.textoPrincipal,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             mesa.nombreArea.uppercase(),
@@ -1401,29 +1610,19 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                             fontWeight = FontWeight.Bold,
                                             color = c.textoSecundario,
                                             fontSize = 9.sp,
-                                            letterSpacing = 0.5.sp
+                                            letterSpacing = 0.5.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
-
-                                    Surface(
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = colorBgBadge
-                                    ) {
-                                        Row(
-                                            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Box(Modifier.size(5.dp).clip(CircleShape).background(colorAcento))
-                                            Text(
-                                                textoEstado,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = colorAcento,
-                                                fontSize = 9.sp
-                                            )
-                                        }
-                                    }
+                                    Spacer(Modifier.width(6.dp))
+                                    EstadoPill(
+                                        texto = textoEstado,
+                                        colorContenido = colorAcento,
+                                        colorFondo = colorBgBadge,
+                                        borde = colorAcento.copy(alpha = 0.30f),
+                                        dotColor = colorAcento
+                                    )
                                 }
 
                                 // Información operativa: Capacidad y Mozo
@@ -1440,12 +1639,12 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                     )
                                     Text(
                                         "${mesa.capacidad} pax",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodySmall.tabular(),
                                         color = c.textoSecundario,
                                         fontSize = 11.sp
                                     )
                                     if (ocupadaServidor) {
-                                        Text("·", color = c.borde, fontWeight = FontWeight.Bold)
+                                        Text("·", color = MaterialTheme.colorScheme.outlineVariant, fontWeight = FontWeight.Bold)
                                         Text(
                                             pedidoActivo?.codigoMozo?.takeIf { it.isNotBlank() }?.let { "Mozo $it" } ?: "En atención",
                                             style = MaterialTheme.typography.bodySmall,
@@ -1455,11 +1654,11 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     } else if (tieneBorradorLocal) {
-                                        Text("·", color = c.borde, fontWeight = FontWeight.Bold)
+                                        Text("·", color = MaterialTheme.colorScheme.outlineVariant, fontWeight = FontWeight.Bold)
                                         Text(
                                             "Sin enviar",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = if (s.modoOscuro) AmbarDorado else AmbarProfundo,
+                                            color = acento,
                                             fontSize = 11.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -1469,12 +1668,13 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
 
                                 // Banda Inferior de Consumo Gastronómico
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (libre) c.fondo else c.contenedor,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (libre) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainer,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
-                                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -1488,17 +1688,23 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                             style = MaterialTheme.typography.labelSmall,
                                             color = c.textoSecundario,
                                             fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
                                         )
+                                        Spacer(Modifier.width(4.dp))
                                         Text(
                                             if (libre) "Disponible" else dinero(consumoCentimos),
-                                            style = MaterialTheme.typography.labelMedium,
+                                            style = MaterialTheme.typography.labelLarge.tabular(),
                                             fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             color = when {
-                                                libre -> VerdeEsmeralda
-                                                esPedidoOffline || tieneBorradorLocal -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
-                                                esListoCocina -> VerdeEsmeralda
-                                                else -> if (s.modoOscuro) AmbarDorado else Borgona
+                                                libre -> c.verde
+                                                esPedidoOffline || tieneBorradorLocal -> acento
+                                                esListoCocina -> c.azul
+                                                else -> acento
                                             }
                                         )
                                     }
@@ -1507,15 +1713,16 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                 // Botón de Acción Táctil
                                 Button(
                                     onClick = { vm.abrir(mesa) },
-                                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    modifier = Modifier.fillMaxWidth().height(38.dp),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = when {
-                                            libre -> Borgona
+                                            libre -> MaterialTheme.colorScheme.primary
                                             esPedidoOffline || tieneBorradorLocal -> AmbarProfundo
-                                            esListoCocina -> VerdeEsmeralda
+                                            esListoCocina -> AzulListo
                                             else -> RojoCoral
-                                        }
+                                        },
+                                        contentColor = BlancoPuro
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
@@ -1540,7 +1747,9 @@ private fun Salon(s: PosUiState, vm: PosViewModel) {
                                             else -> "Ver Comanda"
                                         },
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -1595,19 +1804,13 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                     "Mesa ${s.mesa?.codigoMesa.orEmpty()}",
                     pedidoServidor?.let { "${it.codigoPedido} · ${it.estado.replace('_', ' ')}" } ?: "Borrador en edición"
                 )
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = c.contenedor,
-                    border = BorderStroke(1.dp, Borgona.copy(alpha = 0.2f))
-                ) {
-                    Text(
-                        "${lineasVisibles.sumOf { it.cantidad }} platos",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Borgona
-                    )
-                }
+                EstadoPill(
+                    texto = "${lineasVisibles.sumOf { it.cantidad }} platos",
+                    colorContenido = c.acento,
+                    colorFondo = c.acentoSuave,
+                    borde = c.acento.copy(alpha = 0.25f),
+                    icono = Icons.Default.RestaurantMenu
+                )
             }
 
             if (b.creacionIncierta) {
@@ -1626,13 +1829,13 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp)
                     )
                     Button(
                         onClick = { vm.recuperar(recuperarId); recuperarId = "" },
                         enabled = !s.busy && recuperarId.isNotBlank(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) { Text("Cargar") }
                 }
             }
@@ -1640,18 +1843,18 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
             // Pestañas Menú / Resumen de comanda
             PrimaryTabRow(
                 selectedTabIndex = if (tab == "Menú") 0 else 1,
-                containerColor = c.superficie,
-                contentColor = Borgona
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = c.acento
             ) {
                 Tab(
                     selected = tab == "Menú",
                     onClick = { tab = "Menú" },
-                    text = { Text("Catálogo Menú (${s.productos.size})", fontWeight = FontWeight.Bold) }
+                    text = { Text("Catálogo Menú (${s.productos.size})", style = MaterialTheme.typography.labelLarge.tabular(), fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = tab == "Comanda",
                     onClick = { tab = "Comanda" },
-                    text = { Text("Ver Comanda (${lineasVisibles.sumOf { it.cantidad }})", fontWeight = FontWeight.Bold) }
+                    text = { Text("Ver Comanda (${lineasVisibles.sumOf { it.cantidad }})", style = MaterialTheme.typography.labelLarge.tabular(), fontWeight = FontWeight.Bold) }
                 )
             }
         }
@@ -1665,9 +1868,9 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                         value = buscar,
                         onValueChange = { buscar = it },
                         label = { Text("Buscar pollo, parrillada, bebida...") },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Borgona) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = c.acento) },
                         singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -1686,17 +1889,27 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 cat == "Todo" -> "🍽️ "
                                 else -> "🍴 "
                             }
+                            val catBg by animateColorAsState(
+                                if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                animationSpec = tween(180),
+                                label = "CatBg"
+                            )
+                            val catBorder by animateColorAsState(
+                                if (sel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                animationSpec = tween(180),
+                                label = "CatBorder"
+                            )
                             Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (sel) Borgona else c.superficie,
-                                border = BorderStroke(1.dp, if (sel) Borgona else c.borde),
+                                shape = RoundedCornerShape(999.dp),
+                                color = catBg,
+                                border = BorderStroke(1.dp, catBorder),
                                 shadowElevation = if (sel) 2.dp else 0.dp,
                                 modifier = Modifier.clickable { categoria = cat }
                             ) {
                                 Text(
                                     text = "$emoji$cat",
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelLarge,
                                     fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                                     color = if (sel) BlancoPuro else c.textoPrincipal
                                 )
@@ -1726,11 +1939,21 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                     p.categoria.contains("Postre", true) -> "🍰"
                                     else -> "🍽️"
                                 }
+                                val platoBg by animateColorAsState(
+                                    if (cantBorrador > 0) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface,
+                                    animationSpec = tween(180),
+                                    label = "PlatoBg"
+                                )
+                                val platoBorder by animateColorAsState(
+                                    if (cantBorrador > 0) c.acento.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
+                                    animationSpec = tween(180),
+                                    label = "PlatoBorder"
+                                )
 
                                 Surface(
-                                    shape = RoundedCornerShape(18.dp),
-                                    color = c.superficie,
-                                    border = BorderStroke(1.dp, if (cantBorrador > 0) Borgona.copy(alpha = 0.5f) else c.borde),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = platoBg,
+                                    border = BorderStroke(1.dp, platoBorder),
                                     shadowElevation = if (cantBorrador > 0) 3.dp else 1.dp,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -1741,8 +1964,9 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(14.dp),
-                                                color = if (cantBorrador > 0) Borgona.copy(alpha = 0.15f) else c.contenedor,
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = if (cantBorrador > 0) c.acentoSuave else MaterialTheme.colorScheme.surfaceContainer,
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                                                 modifier = Modifier.size(54.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
@@ -1760,22 +1984,19 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                         p.nombre,
                                                         fontWeight = FontWeight.Bold,
                                                         style = MaterialTheme.typography.titleMedium,
-                                                        color = c.textoPrincipal
+                                                        color = c.textoPrincipal,
+                                                        modifier = Modifier.weight(1f),
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
                                                     )
                                                     if (p.idProducto % 2L == 0L) {
-                                                        Surface(
-                                                            shape = RoundedCornerShape(6.dp),
-                                                            color = AmbarDorado.copy(alpha = 0.2f)
-                                                        ) {
-                                                            Text(
-                                                                "🔥 TOP",
-                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                                style = MaterialTheme.typography.labelSmall,
-                                                                fontWeight = FontWeight.Black,
-                                                                color = AmbarProfundo,
-                                                                fontSize = 9.sp
-                                                            )
-                                                        }
+                                                        Spacer(Modifier.width(6.dp))
+                                                        EstadoPill(
+                                                            texto = "TOP",
+                                                            colorContenido = if (s.modoOscuro) AmbarDorado else AmbarProfundo,
+                                                            colorFondo = c.ambarBg,
+                                                            borde = AmbarDorado.copy(alpha = 0.35f)
+                                                        )
                                                     }
                                                 }
 
@@ -1787,7 +2008,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                     overflow = TextOverflow.Ellipsis
                                                 )
 
-                                                Spacer(Modifier.height(6.dp))
+                                                Spacer(Modifier.height(8.dp))
 
                                                 Row(
                                                     Modifier.fillMaxWidth(),
@@ -1796,16 +2017,19 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                 ) {
                                                     Text(
                                                         dinero(p.precioCentimos),
-                                                        style = MaterialTheme.typography.titleMedium,
+                                                        style = MaterialTheme.typography.titleMedium.tabular(),
                                                         fontWeight = FontWeight.ExtraBold,
-                                                        color = if (s.modoOscuro) AmbarDorado else Borgona
+                                                        color = c.acento
                                                     )
 
                                                     if (cantBorrador == 0) {
                                                         Button(
                                                             onClick = { vm.agregar(p) },
                                                             enabled = !s.busy && s.editable,
-                                                            colors = ButtonDefaults.buttonColors(containerColor = Borgona),
+                                                            colors = ButtonDefaults.buttonColors(
+                                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                                contentColor = BlancoPuro
+                                                            ),
                                                             shape = RoundedCornerShape(10.dp),
                                                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                                             modifier = Modifier.height(36.dp)
@@ -1817,8 +2041,8 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                     } else {
                                                         Surface(
                                                             shape = RoundedCornerShape(10.dp),
-                                                            color = c.contenedor,
-                                                            border = BorderStroke(1.dp, Borgona.copy(alpha = 0.3f))
+                                                            color = c.acentoSuave,
+                                                            border = BorderStroke(1.dp, c.acento.copy(alpha = 0.38f))
                                                         ) {
                                                             Row(
                                                                 verticalAlignment = Alignment.CenterVertically,
@@ -1840,15 +2064,15 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                                     modifier = Modifier.size(32.dp),
                                                                     enabled = !s.busy && s.editable
                                                                 ) {
-                                                                    Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp), tint = Borgona)
+                                                                    Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp), tint = c.acento)
                                                                 }
 
                                                                 Text(
                                                                     cantBorrador.toString(),
                                                                     fontWeight = FontWeight.ExtraBold,
-                                                                    style = MaterialTheme.typography.titleMedium,
-                                                                    color = Borgona,
-                                                                    modifier = Modifier.widthIn(min = 20.dp),
+                                                                    style = MaterialTheme.typography.titleMedium.tabular(),
+                                                                    color = c.acento,
+                                                                    modifier = Modifier.widthIn(min = 22.dp),
                                                                     textAlign = TextAlign.Center
                                                                 )
 
@@ -1857,7 +2081,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                                                     modifier = Modifier.size(32.dp),
                                                                     enabled = !s.busy && s.editable
                                                                 ) {
-                                                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Borgona)
+                                                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = c.acento)
                                                                 }
                                                             }
                                                         }
@@ -1884,8 +2108,17 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                             item {
                                 val esOfflinePedido = pedidoServidor.estado == "PEDIDO_POR_SINCRONIZAR"
                                 val esListoOffline = pedidoServidor.estado == "LISTO_POR_SINCRONIZAR"
-                                val colorCard = if (esOfflinePedido || esListoOffline) c.ambarBg else c.verdeBg
-                                val tintCard = if (esOfflinePedido || esListoOffline) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else VerdeEsmeralda
+                                val esListoPedido = pedidoServidor.estado == "LISTO"
+                                val colorCard = when {
+                                    esOfflinePedido || esListoOffline -> c.ambarBg
+                                    esListoPedido -> c.azulBg
+                                    else -> c.verdeBg
+                                }
+                                val tintCard = when {
+                                    esOfflinePedido || esListoOffline -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
+                                    esListoPedido -> c.azul
+                                    else -> c.verde
+                                }
                                 val tituloEstado = when (pedidoServidor.estado) {
                                     "PEDIDO_POR_SINCRONIZAR" -> "PEDIDO (POR SINCRONIZAR)"
                                     "LISTO_POR_SINCRONIZAR" -> "LISTO EN COCINA (POR SINCRONIZAR)"
@@ -1924,42 +2157,52 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                         itemsIndexed(lineasVisibles) { index, l ->
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = c.superficie,
-                                border = BorderStroke(1.dp, c.borde),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 shadowElevation = 2.dp,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(l.nombre, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), color = c.textoPrincipal)
-                                        Text(dinero(l.precioCentimos * l.cantidad), fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona, style = MaterialTheme.typography.titleMedium)
+                                        Text(dinero(l.precioCentimos * l.cantidad), fontWeight = FontWeight.ExtraBold, color = c.acento, style = MaterialTheme.typography.titleMedium.tabular())
                                     }
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                        Text("${dinero(l.precioCentimos)} c/u", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                                        Text("${dinero(l.precioCentimos)} c/u", style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoSecundario)
                                         if (pedidoServidor != null) {
                                             val estColor = when (l.estado) {
-                                                "LISTO", "ENTREGADO" -> VerdeEsmeralda
+                                                "LISTO", "ENTREGADO" -> c.verde
                                                 "LISTO_POR_SINCRONIZAR" -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
                                                 else -> c.textoSecundario
                                             }
-                                            Text(
-                                                when (l.estado) {
+                                            val estBg = when (l.estado) {
+                                                "LISTO", "ENTREGADO" -> c.verdeBg
+                                                "LISTO_POR_SINCRONIZAR" -> c.ambarBg
+                                                else -> MaterialTheme.colorScheme.surfaceContainerLow
+                                            }
+                                            EstadoPill(
+                                                texto = when (l.estado) {
                                                     "LISTO_POR_SINCRONIZAR" -> "LISTO (POR SINCRONIZAR)"
                                                     else -> l.estado.replace('_', ' ')
                                                 },
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = estColor
+                                                colorContenido = estColor,
+                                                colorFondo = estBg,
+                                                borde = estColor.copy(alpha = 0.3f),
+                                                icono = when (l.estado) {
+                                                    "LISTO", "ENTREGADO" -> Icons.Default.CheckCircle
+                                                    "LISTO_POR_SINCRONIZAR" -> Icons.Default.CloudUpload
+                                                    else -> Icons.Default.Schedule
+                                                }
                                             )
                                         }
                                     }
 
                                     if (l.observaciones.isNotBlank()) {
-                                        Surface(shape = RoundedCornerShape(8.dp), color = c.ambarBg) {
+                                        Surface(shape = RoundedCornerShape(10.dp), color = c.ambarBg) {
                                             Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Info, null, modifier = Modifier.size(14.dp), tint = AmbarProfundo)
+                                                Icon(Icons.Default.Info, null, modifier = Modifier.size(14.dp), tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
                                                 Spacer(Modifier.width(4.dp))
-                                                Text(l.observaciones, style = MaterialTheme.typography.labelSmall, color = AmbarProfundo, fontWeight = FontWeight.Bold)
+                                                Text(l.observaciones, style = MaterialTheme.typography.labelSmall, color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -1969,12 +2212,12 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                             IconButton(
                                                 onClick = { vm.cantidad(index, -1) },
                                                 enabled = !s.busy && l.cantidad > 1
-                                            ) { Icon(Icons.Default.RemoveCircleOutline, "Restar", tint = Borgona) }
+                                            ) { Icon(Icons.Default.RemoveCircleOutline, "Restar", tint = c.acento) }
 
                                             Text(
                                                 l.cantidad.toString(),
                                                 fontWeight = FontWeight.ExtraBold,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = MaterialTheme.typography.titleMedium.tabular(),
                                                 modifier = Modifier.padding(horizontal = 8.dp),
                                                 color = c.textoPrincipal
                                             )
@@ -1982,28 +2225,24 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                             IconButton(
                                                 onClick = { vm.cantidad(index, 1) },
                                                 enabled = !s.busy && l.cantidad < 99
-                                            ) { Icon(Icons.Default.AddCircleOutline, "Sumar", tint = Borgona) }
+                                            ) { Icon(Icons.Default.AddCircleOutline, "Sumar", tint = c.acento) }
 
                                             Spacer(Modifier.weight(1f))
 
                                             IconButton(onClick = { editarNota = index }, enabled = !s.busy) {
-                                                Icon(Icons.Default.EditNote, "Notas", tint = AmbarProfundo)
+                                                Icon(Icons.Default.EditNote, "Notas", tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
                                             }
                                             IconButton(onClick = { quitar = index }, enabled = !s.busy) {
                                                 Icon(Icons.Default.DeleteOutline, "Eliminar", tint = RojoCoral)
                                             }
                                         } else {
-                                            Text("Cantidad: ${l.cantidad} unidad(es)", fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                                            Text("Cantidad: ${l.cantidad} unidad(es)", style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                                             Spacer(Modifier.weight(1f))
-                                            Surface(shape = RoundedCornerShape(10.dp), color = if (l.estado == "LISTO") c.verdeBg else c.ambarBg) {
-                                                Text(
-                                                    l.estado,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (l.estado == "LISTO") VerdeEsmeralda else AmbarProfundo
-                                                )
-                                            }
+                                            EstadoPill(
+                                                texto = l.estado.replace('_', ' '),
+                                                colorContenido = if (l.estado == "LISTO") c.verde else (if (s.modoOscuro) AmbarDorado else AmbarProfundo),
+                                                colorFondo = if (l.estado == "LISTO") c.verdeBg else c.ambarBg
+                                            )
                                         }
                                     }
                                 }
@@ -2016,7 +2255,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 onValueChange = vm::observaciones,
                                 label = { Text("Nota general del pedido") },
                                 enabled = s.editable && b.idPedido == null && !s.busy,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth(),
                                 maxLines = 3
                             )
@@ -2029,7 +2268,7 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                                 OutlinedButton(
                                     onClick = { mover = true },
                                     enabled = !s.busy && esPropioOAdmin && pedidoServidor.estado !in listOf("PAGADO", "ANULADO"),
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Default.SwapHoriz, null)
@@ -2089,16 +2328,16 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                             }
                             Text(
                                 dinero(b.lineas.total()),
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleLarge.tabular(),
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (s.modoOscuro) AmbarDorado else Borgona
+                                color = c.acento
                             )
                         }
 
                         Button(
                             onClick = { tab = "Comanda" },
-                            colors = ButtonDefaults.buttonColors(containerColor = Borgona),
-                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.height(44.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, modifier = Modifier.size(18.dp))
@@ -2111,9 +2350,9 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
         } else {
             // Barra inferior de totales y despacho
             Surface(
-                color = c.superficie,
-                shadowElevation = 12.dp,
-                border = BorderStroke(1.dp, c.borde)
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 10.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     val totalCalculado = pedidoServidor?.importeCentimos ?: lineasVisibles.total()
@@ -2122,16 +2361,16 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Subtotal:", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
-                        Text(dinero(subtotalCentimos), style = MaterialTheme.typography.bodySmall, color = c.textoPrincipal)
+                        Text(dinero(subtotalCentimos), style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoPrincipal)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("IGV (18%):", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
-                        Text(dinero(igvCentimos), style = MaterialTheme.typography.bodySmall, color = c.textoPrincipal)
+                        Text(dinero(igvCentimos), style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoPrincipal)
                     }
-                    HorizontalDivider(color = c.borde)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Total Comanda:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
-                        Text(dinero(totalCalculado), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
+                        Text(dinero(totalCalculado), style = MaterialTheme.typography.headlineSmall.tabular(), fontWeight = FontWeight.ExtraBold, color = c.acento)
                     }
 
                     if (s.editable) {
@@ -2139,20 +2378,22 @@ private fun Comanda(s: PosUiState, vm: PosViewModel) {
                             OutlinedButton(
                                 onClick = vm::guardarBorrador,
                                 enabled = !s.busy && b.lineas.isNotEmpty(),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
                                 modifier = Modifier.weight(1f).height(48.dp)
-                            ) { Text("Guardar Borrador") }
+                            ) { Text("Guardar Borrador", fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
 
                             Button(
                                 onClick = { confirmarEnvio = true },
                                 enabled = !s.busy && b.lineas.isNotEmpty(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Borgona),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 modifier = Modifier.weight(1f).height(48.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.Send, null)
+                                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Enviar a Cocina", fontWeight = FontWeight.Bold)
+                                Text("Enviar a Cocina", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -2205,6 +2446,7 @@ private fun NotaDialog(inicial: String, cerrar: () -> Unit, guardar: (String) ->
     var nota by remember { mutableStateOf(inicial) }
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Instrucciones para Cocina", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2229,7 +2471,11 @@ private fun NotaDialog(inicial: String, cerrar: () -> Unit, guardar: (String) ->
             }
         },
         confirmButton = {
-            Button(onClick = { guardar(nota) }, colors = ButtonDefaults.buttonColors(containerColor = Borgona)) {
+            Button(
+                onClick = { guardar(nota) },
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
                 Text("Guardar Nota")
             }
         },
@@ -2243,6 +2489,7 @@ private fun TrasladoDialog(s: PosUiState, cerrar: () -> Unit, aceptar: (Long, St
     var motivo by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Trasladar Comanda", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2273,7 +2520,8 @@ private fun TrasladoDialog(s: PosUiState, cerrar: () -> Unit, aceptar: (Long, St
             Button(
                 onClick = { destino?.let { aceptar(it, motivo) } },
                 enabled = destino != null,
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) { Text("Confirmar Traslado") }
         },
         dismissButton = { TextButton(onClick = cerrar) { Text("Cancelar") } }
@@ -2370,15 +2618,23 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Heading(
-                "Monitor KDS Cocina",
-                if (s.socketConectado) "En Vivo · WebSocket Conectado" else "Sondeo cada 15s",
-                Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Heading(
+                    "Monitor KDS Cocina",
+                    if (s.socketConectado) "En Vivo · WebSocket Conectado" else "Sondeo cada 15s"
+                )
+                EstadoPill(
+                    texto = if (s.socketConectado) "WebSocket En Vivo · KDS" else "Modo Sondeo (15s)",
+                    colorContenido = if (s.socketConectado) c.verde else (if (s.modoOscuro) AmbarDorado else AmbarProfundo),
+                    colorFondo = if (s.socketConectado) c.verdeBg else c.ambarBg,
+                    dotColor = if (s.socketConectado) c.verde else AmbarAlerta
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             Button(
                 onClick = { verAgotados = true },
-                colors = ButtonDefaults.buttonColors(containerColor = AmbarProfundo),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = AmbarProfundo, contentColor = BlancoPuro),
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Block, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
@@ -2392,9 +2648,9 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
             value = buscar,
             onValueChange = { buscar = it },
             label = { Text("Filtrar mesa o plato en cocina...") },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = if (s.modoOscuro) AmbarDorado else Borgona) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = c.acento) },
             singleLine = true,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -2427,12 +2683,17 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                     val colorEspera = when (nivel) {
                         "ROJO", "CRITICO" -> RojoCoral
                         "AMARILLO", "ALERTA" -> AmbarAlerta
-                        else -> VerdeEsmeralda
+                        else -> c.verde
                     }
                     val bgEspera = when (nivel) {
                         "ROJO", "CRITICO" -> c.rojoBg
                         "AMARILLO", "ALERTA" -> c.ambarBg
                         else -> c.verdeBg
+                    }
+                    val etiquetaSemaforo = when (nivel) {
+                        "ROJO", "CRITICO" -> "URGENTE"
+                        "AMARILLO", "ALERTA" -> "ATENCIÓN"
+                        else -> "A TIEMPO"
                     }
                     val bordeAnimado by animateColorAsState(colorEspera, label = "kdsBorder")
                     val listosCount = p.lineas.count { it.estado == "LISTO" || it.estado == "ENTREGADO" }
@@ -2442,129 +2703,168 @@ private fun CocinaKds(s: PosUiState, vm: PosViewModel) {
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = c.superficie,
-                        border = BorderStroke(2.dp, bordeAnimado),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.5.dp, bordeAnimado),
                         shadowElevation = 4.dp,
                         modifier = Modifier.fillMaxWidth().animateContentSize()
                     ) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        Column {
+                            // Cabecera Semáforo de Cocina
+                            Surface(
+                                color = bgEspera.copy(alpha = if (c.esOscuro) 0.55f else 0.72f),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column {
-                                    Text("MESA ${p.codigoMesa}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
-                                    Text("${p.codigoPedido} · Mozo: ${p.codigoMozo.orEmpty()} · $listosCount/${p.lineas.size} listos", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
-                                }
-                                Surface(shape = RoundedCornerShape(20.dp), color = bgEspera) {
-                                    Row(
-                                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(Icons.Default.Timer, null, modifier = Modifier.size(16.dp), tint = colorEspera)
-                                        Text("$minEspera min", fontWeight = FontWeight.ExtraBold, color = colorEspera)
-                                    }
-                                }
-                            }
-
-                            LinearProgressIndicator(
-                                progress = { progresoKds },
-                                modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
-                                color = if (listosCount == p.lineas.size && p.lineas.isNotEmpty()) VerdeEsmeralda else colorEspera,
-                                trackColor = c.borde
-                            )
-
-                            // Lista de platos con botón táctil individual FUNCIONAL (idDetallePedido)
-                            p.lineas.forEach { l ->
-                                val platoListoSync = l.estado == "LISTO_POR_SINCRONIZAR"
-                                val platoListo = l.estado in listOf("LISTO", "LISTO_POR_SINCRONIZAR", "ENTREGADO")
                                 Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (platoListoSync) c.ambarBg else if (platoListo) c.verdeBg else c.contenedor,
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                "${l.cantidad}x",
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = if (platoListoSync) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else if (platoListo) VerdeEsmeralda else if (s.modoOscuro) AmbarDorado else Borgona
-                                            )
-                                        }
-                                    }
-
                                     Column(Modifier.weight(1f)) {
-                                        Text(
-                                            l.nombre,
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = if (platoListo) c.textoSecundario else c.textoPrincipal,
-                                            textDecoration = if (platoListo) TextDecoration.LineThrough else TextDecoration.None
-                                        )
-                                        if (l.observaciones.isNotBlank()) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Text(
-                                                "Nota: ${l.observaciones}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = if (s.modoOscuro) Color(0xFFFFCC66) else AmbarProfundo,
-                                                fontWeight = FontWeight.Bold
+                                                "MESA ${p.codigoMesa}",
+                                                style = MaterialTheme.typography.titleLarge.tabular(),
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = c.acento
+                                            )
+                                            EstadoPill(
+                                                texto = etiquetaSemaforo,
+                                                colorContenido = colorEspera,
+                                                colorFondo = MaterialTheme.colorScheme.surface,
+                                                borde = colorEspera.copy(alpha = 0.45f),
+                                                dotColor = colorEspera
                                             )
                                         }
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            "${p.codigoPedido} · Mozo: ${p.codigoMozo.orEmpty()} · $listosCount/${p.lineas.size} listos",
+                                            style = MaterialTheme.typography.labelMedium.tabular(),
+                                            color = c.textoSecundario
+                                        )
                                     }
+                                    EstadoPill(
+                                        texto = "$minEspera min",
+                                        colorContenido = colorEspera,
+                                        colorFondo = MaterialTheme.colorScheme.surface,
+                                        borde = colorEspera.copy(alpha = 0.45f),
+                                        icono = Icons.Default.Timer
+                                    )
+                                }
+                            }
 
-                                    Button(
-                                        onClick = { l.idDetalle?.let { vm.marcarPlatoListo(it) } },
-                                        enabled = !s.busy && !platoListo && l.idDetalle != null,
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (platoListoSync) AmbarProfundo else if (platoListo) VerdeEsmeralda else Borgona,
-                                            disabledContainerColor = if (platoListoSync) c.ambarBg else c.verdeBg
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                LinearProgressIndicator(
+                                    progress = { progresoKds },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = if (listosCount == p.lineas.size && p.lineas.isNotEmpty()) c.verde else colorEspera,
+                                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+
+                                // Lista de platos con botón táctil individual FUNCIONAL (idDetallePedido)
+                                p.lineas.forEach { l ->
+                                    val platoListoSync = l.estado == "LISTO_POR_SINCRONIZAR"
+                                    val platoListo = l.estado in listOf("LISTO", "LISTO_POR_SINCRONIZAR", "ENTREGADO")
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (platoListo) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.65f) else MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        if (platoListoSync) {
-                                            Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(14.dp), tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("Listo (Sync)", color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                        } else if (platoListo) {
-                                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = VerdeEsmeralda)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("Listo", color = VerdeEsmeralda, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        } else {
-                                            Text("Listo ✓", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = if (platoListoSync) c.ambarBg else if (platoListo) c.verdeBg else c.acentoSuave,
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        "${l.cantidad}x",
+                                                        style = MaterialTheme.typography.titleSmall.tabular(),
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = if (platoListoSync) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else if (platoListo) c.verde else c.acento
+                                                    )
+                                                }
+                                            }
+
+                                            Column(Modifier.weight(1f)) {
+                                                Text(
+                                                    l.nombre,
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    color = if (platoListo) c.textoSecundario else c.textoPrincipal,
+                                                    textDecoration = if (platoListo) TextDecoration.LineThrough else TextDecoration.None
+                                                )
+                                                if (l.observaciones.isNotBlank()) {
+                                                    Text(
+                                                        "Nota: ${l.observaciones}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = if (s.modoOscuro) Color(0xFFFFCC66) else AmbarProfundo,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+
+                                            Button(
+                                                onClick = { l.idDetalle?.let { vm.marcarPlatoListo(it) } },
+                                                enabled = !s.busy && !platoListo && l.idDetalle != null,
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (platoListoSync) AmbarProfundo else if (platoListo) VerdeEsmeralda else MaterialTheme.colorScheme.primary,
+                                                    contentColor = BlancoPuro,
+                                                    disabledContainerColor = if (platoListoSync) c.ambarBg else c.verdeBg
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                            ) {
+                                                if (platoListoSync) {
+                                                    Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(14.dp), tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text("Listo (Sync)", color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, softWrap = false)
+                                                } else if (platoListo) {
+                                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = c.verde)
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text("Listo", color = c.verde, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
+                                                } else {
+                                                    Text("Listo ✓", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            if (p.idPedido > 0 && listosCount < p.lineas.size) {
-                                OutlinedButton(
-                                    onClick = { vm.marcarPedidoListoCocina(p.idPedido) },
-                                    enabled = !s.busy,
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.DoneAll, null, modifier = Modifier.size(16.dp), tint = VerdeEsmeralda)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Marcar todo el pedido listo", fontWeight = FontWeight.Bold, color = VerdeEsmeralda, fontSize = 12.sp)
+                                if (p.idPedido > 0 && listosCount < p.lineas.size) {
+                                    Button(
+                                        onClick = { vm.marcarPedidoListoCocina(p.idPedido) },
+                                        enabled = !s.busy,
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = VerdeEsmeralda, contentColor = BlancoPuro),
+                                        modifier = Modifier.fillMaxWidth().height(44.dp)
+                                    ) {
+                                        Icon(Icons.Default.DoneAll, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Marcar todo el pedido listo", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
                                 }
-                            }
 
-                            if (!p.observaciones.isNullOrBlank()) {
-                                Surface(shape = RoundedCornerShape(10.dp), color = c.ambarBg, modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        "Comanda: ${p.observaciones}",
-                                        modifier = Modifier.padding(10.dp),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (s.modoOscuro) Color(0xFFFFCC66) else AmbarProfundo
-                                    )
+                                if (!p.observaciones.isNullOrBlank()) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = c.ambarBg,
+                                        border = BorderStroke(1.dp, AmbarDorado.copy(alpha = 0.3f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            "Comanda: ${p.observaciones}",
+                                            modifier = Modifier.padding(10.dp),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (s.modoOscuro) Color(0xFFFFCC66) else AmbarProfundo
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2706,21 +3006,31 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
         Heading("Caja & Facturación Electrónica", "Apertura de turno, boletas, facturas y cobros multicanal")
         s.colaSync.filter { it.tipo == TipoAccionSync.COBRAR_PEDIDO }.forEach { cobroPend ->
             val acentoAmbar = if (s.modoOscuro) AmbarDorado else AmbarProfundo
-            Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, acentoAmbar.copy(alpha = 0.4f))) {
+            Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, acentoAmbar.copy(alpha = 0.4f))) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.CloudUpload, null, tint = acentoAmbar)
-                    Column(Modifier.weight(1f)) {
-                        Text("Cobro en cola (POR SINCRONIZAR)", fontWeight = FontWeight.Bold, color = acentoAmbar, fontSize = 13.sp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        EstadoPill(
+                            texto = "Cobro en cola · POR SINCRONIZAR",
+                            colorContenido = acentoAmbar,
+                            colorFondo = MaterialTheme.colorScheme.surface,
+                            borde = acentoAmbar.copy(alpha = 0.35f)
+                        )
                         Text(cobroPend.descripcion, style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
                     }
                 }
             }
         }
         s.pendientesEmision.forEach { solicitud ->
-            Surface(Modifier.fillMaxWidth(), color = c.ambarBg, shape = RoundedCornerShape(12.dp)) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                color = c.ambarBg,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, AmbarDorado.copy(alpha = 0.4f))
+            ) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Comprobante pendiente · Pedido #${solicitud.idPedido}", fontWeight = FontWeight.Bold)
-                    Text("Pago #${solicitud.idPago} confirmado.", style = MaterialTheme.typography.bodySmall)
+                    Text("Comprobante pendiente · Pedido #${solicitud.idPedido}", style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.Bold)
+                    Text("Pago #${solicitud.idPago} confirmado.", style = MaterialTheme.typography.bodySmall.tabular())
                     TextButton(onClick = { vm.recuperarComprobante(solicitud) }, enabled = !s.busy) { Text("Recuperar comprobante") }
                 }
             }
@@ -2731,37 +3041,43 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
         if (turno == null || turno.estado != "ABIERTO") {
             s.cierreInfo?.let { cierre ->
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = c.superficie,
-                    border = BorderStroke(1.5.dp, VerdeEsmeralda),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.5.dp, c.verde),
                     shadowElevation = 3.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("Turno #${cierre.idTurno} Cerrado", fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
-                            Text("Arqueo Finalizado", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
+                            Text("Turno #${cierre.idTurno} Cerrado", style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.Bold, color = c.verde)
+                            EstadoPill(
+                                texto = "Arqueo Finalizado",
+                                colorContenido = c.verde,
+                                colorFondo = c.verdeBg,
+                                icono = Icons.Default.CheckCircle
+                            )
                         }
-                        HorizontalDivider(color = c.borde)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Fondo Inicial:", color = c.textoSecundario, fontSize = 13.sp)
-                            Text(dinero(cierre.montoInicialCentimos), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                            Text(dinero(cierre.montoInicialCentimos), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Efectivo Esperado:", color = c.textoSecundario, fontSize = 13.sp)
-                            Text(dinero(cierre.totalEfectivoEsperadoCentimos), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                            Text(dinero(cierre.totalEfectivoEsperadoCentimos), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Efectivo Real en Gaveta:", color = c.textoSecundario, fontSize = 13.sp)
-                            Text(dinero(cierre.totalEfectivoRealCentimos), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                            Text(dinero(cierre.totalEfectivoRealCentimos), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Diferencia de Cuadre:", color = c.textoSecundario, fontSize = 13.sp)
                             val cuadreOk = cierre.diferenciaCentimos == 0L
                             Text(
                                 if (cuadreOk) "S/ 0.00 (Exacto)" else dinero(cierre.diferenciaCentimos),
+                                style = MaterialTheme.typography.bodyMedium.tabular(),
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (cuadreOk) VerdeEsmeralda else RojoCoral
+                                color = if (cuadreOk) c.verde else RojoCoral
                             )
                         }
                     }
@@ -2769,26 +3085,30 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
             }
 
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = c.superficie,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.5.dp, if (s.modoOscuro) AmbarDorado else AmbarProfundo),
                 shadowElevation = 3.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.LockClock, null, tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = c.ambarBg,
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.LockClock, null, tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo, modifier = Modifier.size(18.dp))
+                            }
+                        }
                         Text("Turno de Caja No Iniciado", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal, modifier = Modifier.weight(1f))
                         if (s.pendientesCobro.isNotEmpty()) {
-                            Surface(shape = RoundedCornerShape(10.dp), color = c.ambarBg) {
-                                Text(
-                                    "${s.pendientesCobro.size} en espera",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (s.modoOscuro) AmbarDorado else AmbarProfundo
-                                )
-                            }
+                            EstadoPill(
+                                texto = "${s.pendientesCobro.size} en espera",
+                                colorContenido = if (s.modoOscuro) AmbarDorado else AmbarProfundo,
+                                colorFondo = c.ambarBg
+                            )
                         }
                     }
                     Text("Ingresa el fondo inicial en efectivo para habilitar los cobros del restaurante.", style = MaterialTheme.typography.bodyMedium, color = c.textoSecundario)
@@ -2797,14 +3117,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         onValueChange = { montoApertura = it },
                         label = { Text("Fondo Inicial (S/.)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
                         onClick = { vm.abrirCaja(montoApertura.toDoubleOrNull() ?: 150.0) },
                         enabled = !s.busy && (montoApertura.toDoubleOrNull() ?: 0.0) >= 0,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Borgona),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
                         Text("Abrir Turno de Caja", fontWeight = FontWeight.Bold)
@@ -2814,7 +3134,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
         } else {
             // Tarjeta de Turno Abierto con gradiente profesional Bistro
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.Transparent,
                 shadowElevation = 5.dp,
                 modifier = Modifier.fillMaxWidth()
@@ -2829,7 +3149,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Box(Modifier.size(10.dp).clip(CircleShape).background(VerdeEsmeralda))
-                                Text("Turno Abierto #${turno.idTurno}", fontWeight = FontWeight.ExtraBold, color = BlancoPuro, fontSize = 15.sp)
+                                Text("Turno Abierto #${turno.idTurno}", style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.ExtraBold, color = BlancoPuro)
                             }
                             Button(
                                 onClick = { cerrarCajaModal = true },
@@ -2842,10 +3162,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         }
                         Text("Cajero: ${s.sesion?.usuario?.nombreCompleto} (${turno.cajero})", style = MaterialTheme.typography.bodyMedium, color = BlancoPuro.copy(alpha = 0.9f))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("Fondo Inicial: ${dinero(turno.montoInicialCentimos)}", style = MaterialTheme.typography.bodySmall, color = AmbarDorado, fontWeight = FontWeight.Bold)
-                            Surface(shape = RoundedCornerShape(8.dp), color = VerdeEsmeralda.copy(alpha = 0.25f)) {
-                                Text("OPERATIVO · ${s.pendientesCobro.size} POR COBRAR", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = BlancoPuro)
-                            }
+                            Text("Fondo Inicial: ${dinero(turno.montoInicialCentimos)}", style = MaterialTheme.typography.bodySmall.tabular(), color = AmbarDorado, fontWeight = FontWeight.Bold)
+                            EstadoPill(
+                                texto = "OPERATIVO · ${s.pendientesCobro.size} POR COBRAR",
+                                colorContenido = BlancoPuro,
+                                colorFondo = VerdeEsmeralda.copy(alpha = 0.25f),
+                                borde = VerdeEsmeralda.copy(alpha = 0.55f),
+                                dotColor = VerdeEsmeralda
+                            )
                         }
                     }
                 }
@@ -2861,7 +3185,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                     placeholder = { Text("ej. 1, 2, 3") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f)
                 )
                 Button(
@@ -2869,22 +3193,33 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         vm.cargarPedidoCaja(buscarPedidoId)
                     },
                     enabled = !s.busy && buscarPedidoId.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) { Text("Cargar Cuenta") }
             }
 
             // Cuentas pendientes reales (disponible para Cajero y Administrador)
             val cuentasPendientes = s.pendientesCobro
             if (cuentasPendientes.isNotEmpty()) {
-                Text("Cuentas Pendientes de Cobro (${cuentasPendientes.size}):", style = MaterialTheme.typography.labelMedium, color = c.textoSecundario)
+                Text("Cuentas Pendientes de Cobro (${cuentasPendientes.size}):", style = MaterialTheme.typography.labelLarge.tabular(), color = c.textoSecundario)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     items(cuentasPendientes, key = { it.idPedido }) { ped ->
                         val seleccionada = s.pedido?.idPedido == ped.idPedido
+                        val bgPend by animateColorAsState(
+                            if (seleccionada) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            animationSpec = tween(180),
+                            label = "PendienteBg"
+                        )
+                        val borderPend by animateColorAsState(
+                            if (seleccionada) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            animationSpec = tween(180),
+                            label = "PendienteBorder"
+                        )
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = if (seleccionada) Borgona else c.superficie,
-                            border = BorderStroke(1.dp, if (seleccionada) Borgona else c.borde),
+                            color = bgPend,
+                            border = BorderStroke(1.dp, borderPend),
+                            shadowElevation = if (seleccionada) 3.dp else 0.dp,
                             modifier = Modifier.clickable {
                                 vm.seleccionarPedidoCaja(ped)
                                 buscarPedidoId = ped.idPedido.toString()
@@ -2894,12 +3229,13 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                 Text(
                                     "${ped.codigoMesa} · ${ped.codigoPedido}",
+                                    style = MaterialTheme.typography.titleSmall.tabular(),
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (seleccionada) BlancoPuro else c.textoPrincipal
                                 )
                                 Text(
                                     "${dinero(ped.importeCentimos)} · ${ped.estado.replace('_', ' ')}",
-                                    fontSize = 11.sp,
+                                    style = MaterialTheme.typography.labelSmall.tabular(),
                                     color = if (seleccionada) AmbarDorado else c.textoSecundario,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -2909,8 +3245,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                 }
             } else {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = c.contenedor,
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -2918,7 +3255,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, null, tint = VerdeEsmeralda, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.CheckCircle, null, tint = c.verde, modifier = Modifier.size(18.dp))
                         Text(
                             "No hay cuentas pendientes de cobro.",
                             style = MaterialTheme.typography.bodySmall,
@@ -2935,34 +3272,35 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
             if (pedidoActual != null && totalCentimos > 0) {
                 // Tarjeta de Detalle del Pedido a Cobrar
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = c.superficie,
-                    border = BorderStroke(1.dp, c.borde),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 3.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
                                 Text("Pedido ${pedidoActual.codigoPedido}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = c.textoPrincipal)
                                 Text("Mesa: ${pedidoActual.codigoMesa}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
                             }
-                            Text(dinero(totalCentimos), fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona, style = MaterialTheme.typography.titleLarge)
+                            Text(dinero(totalCentimos), fontWeight = FontWeight.ExtraBold, color = c.acento, style = MaterialTheme.typography.headlineSmall.tabular())
                         }
 
                         // Detalle del consumo
                         if (pedidoActual.lineas.isNotEmpty()) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = c.contenedor,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("Detalle del Consumo:", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = c.textoSecundario)
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("Detalle del Consumo:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
                                     pedidoActual.lineas.forEach { linea ->
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("${linea.cantidad}x ${linea.nombre}", fontSize = 13.sp, color = c.textoPrincipal, modifier = Modifier.weight(1f))
-                                            Text(dinero(linea.precioCentimos * linea.cantidad), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                                            Text(dinero(linea.precioCentimos * linea.cantidad), style = MaterialTheme.typography.bodySmall.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                                         }
                                     }
                                 }
@@ -2977,9 +3315,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Percent, null, tint = if (s.modoOscuro) AmbarDorado else AmbarProfundo, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Percent, null, tint = c.acento, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Descuento", color = if (s.modoOscuro) AmbarDorado else AmbarProfundo)
+                                Text("Descuento", color = c.acento)
                             }
                             if (s.puedeAdmin) {
                                 OutlinedButton(
@@ -2996,11 +3334,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                         }
 
-                        HorizontalDivider(color = c.borde)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                         // 3. Consulta de Cliente SUNAT (DNI / RUC / Sin Doc)
                         Text("Comprobante y Datos del Cliente (SUNAT):", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = c.textoPrincipal)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             listOf("DNI", "RUC", "Sin Doc").forEach { t ->
                                 FilterChip(
                                     selected = tipoDoc == t,
@@ -3011,7 +3352,13 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                         direccionCliente = ""
                                         vm.limpiarCliente()
                                     },
-                                    label = { Text(if (t == "RUC") "RUC (Factura)" else if (t == "DNI") "DNI (Boleta)" else "Boleta Sin Doc") }
+                                    label = {
+                                        Text(
+                                            if (t == "RUC") "RUC (Factura)" else if (t == "DNI") "DNI (Boleta)" else "Boleta Sin Doc",
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
                                 )
                             }
                         }
@@ -3041,7 +3388,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     onClick = { vm.buscarCliente(tipoDoc, numDoc) },
                                     enabled = !s.busy && !s.buscandoCliente && numDoc.length == largoRequerido,
                                     shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
                                     if (s.buscandoCliente) {
                                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
@@ -3058,7 +3405,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                         (cliente.estadoSunat.isNotBlank() && !cliente.estadoSunat.equals("ACTIVO", ignoreCase = true))
                                     )
                                     val cardBg = if (tieneAlertaSunat) c.ambarBg else c.verdeBg
-                                    val cardTint = if (tieneAlertaSunat) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else VerdeEsmeralda
+                                    val cardTint = if (tieneAlertaSunat) (if (s.modoOscuro) AmbarDorado else AmbarProfundo) else c.verde
                                     val origenLabel = when (cliente.origenDatos.uppercase()) {
                                         "APISPERU" -> "APISPERU"
                                         "DECOLECTA" -> "DECOLECTA"
@@ -3077,7 +3424,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                             if (esRuc) "SUNAT verificado" else "RENIEC verificado"
                                     }
                                     Surface(
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         color = cardBg,
                                         border = BorderStroke(1.dp, cardTint.copy(alpha = 0.35f)),
                                         modifier = Modifier.fillMaxWidth()
@@ -3098,18 +3445,12 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                                     color = c.textoPrincipal,
                                                     modifier = Modifier.weight(1f)
                                                 )
-                                                Surface(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    color = cardTint.copy(alpha = 0.16f)
-                                                ) {
-                                                    Text(
-                                                        origenLabel,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = cardTint,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    )
-                                                }
+                                                EstadoPill(
+                                                    texto = origenLabel,
+                                                    colorContenido = cardTint,
+                                                    colorFondo = MaterialTheme.colorScheme.surface,
+                                                    borde = cardTint.copy(alpha = 0.35f)
+                                                )
                                             }
                                             Text(
                                                 subtituloEstado,
@@ -3130,8 +3471,9 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                             AnimatedVisibility(visible = s.clienteSeleccionado == null && !s.clienteAviso.isNullOrBlank()) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = c.ambarBg,
+                                    border = BorderStroke(1.dp, AmbarDorado.copy(alpha = 0.3f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -3165,30 +3507,38 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                         }
 
-                        HorizontalDivider(color = c.borde)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                         // 4. Métodos de Pago
                         Text("Método de Pago:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = c.textoPrincipal)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             listOf("Efectivo", "Yape", "Plin", "Tarjeta", "Mixto").forEach { m ->
                                 FilterChip(
                                     selected = metodoPago == m,
                                     onClick = { metodoPago = m },
-                                    label = { Text(m) }
+                                    label = { Text(m, maxLines = 1, softWrap = false) }
                                 )
                             }
                         }
 
                         if (metodoPago == "Efectivo") {
                             // Presets de billetes en efectivo
-                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 listOf("Exacto", "50", "100", "200").forEach { preset ->
                                     OutlinedButton(
                                         onClick = {
-                                            efectivoRecibido = if (preset == "Exacto") totalDouble.toString() else preset
+                                            efectivoRecibido = if (preset == "Exacto") {
+                                                "${totalCentimos / 100}.${(totalCentimos % 100).toString().padStart(2, '0')}"
+                                            } else preset
                                         },
                                         shape = RoundedCornerShape(10.dp)
-                                    ) { Text(if (preset == "Exacto") "Exacto" else "S/ $preset") }
+                                    ) { Text(if (preset == "Exacto") "Exacto" else "S/ $preset", maxLines = 1, softWrap = false) }
                                 }
                             }
                             OutlinedTextField(
@@ -3201,17 +3551,27 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             )
                             val recibidoD = efectivoRecibido.toDoubleOrNull() ?: 0.0
                             val vueltoD = (recibidoD - totalDouble).coerceAtLeast(0.0)
-                            Surface(shape = RoundedCornerShape(12.dp), color = c.verdeBg, modifier = Modifier.fillMaxWidth()) {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = c.verdeBg,
+                                border = BorderStroke(1.dp, c.verde.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Vuelto a Entregar:", fontWeight = FontWeight.Bold, color = VerdeEsmeralda)
-                                    Text(dineroD(vueltoD), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge, color = VerdeEsmeralda)
+                                    Text("Vuelto a Entregar:", fontWeight = FontWeight.Bold, color = c.verde)
+                                    Text(dineroD(vueltoD), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge.tabular(), color = c.verde)
                                 }
                             }
                         } else if (metodoPago in listOf("Yape", "Plin")) {
-                            Surface(shape = RoundedCornerShape(12.dp), color = c.contenedor, modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.QrCode2, null, Modifier.size(64.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
-                                    Text("Escanear QR Wendy's Food en Mostrador", fontWeight = FontWeight.Bold, color = if (s.modoOscuro) AmbarDorado else Borgona)
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(Icons.Default.QrCode2, null, Modifier.size(64.dp), tint = c.acento)
+                                    Text("Escanear QR Wendy's Food en Mostrador", fontWeight = FontWeight.Bold, color = c.acento)
                                 }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3229,46 +3589,44 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     onClick = {
                                         numOperacion = (Clock.System.now().toEpochMilliseconds() % 90000000L + 10000000L).toString()
                                     },
-                                    shape = RoundedCornerShape(10.dp)
-                                ) { Text("Ref Única", fontSize = 11.sp) }
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                                ) { Text("Ref Única", fontSize = 11.sp, maxLines = 1, softWrap = false) }
                             }
                         } else if (metodoPago == "Tarjeta") {
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = c.contenedor,
-                                border = BorderStroke(1.dp, if (s.transaccionTarjeta != null) VerdeEsmeralda else c.borde),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, if (s.transaccionTarjeta != null) c.verde else MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Default.CreditCard, null, tint = c.acento)
+                                        Text("Simulador POS Tarjeta Propio", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = c.textoPrincipal)
+                                    }
                                     Row(
-                                        Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Icon(Icons.Default.CreditCard, null, tint = if (s.modoOscuro) AmbarDorado else Borgona)
-                                            Text("Simulador POS Tarjeta Propio", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = c.textoPrincipal)
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            OutlinedButton(
-                                                onClick = {
-                                                    tarjetaNumero = "4532 0151 1283 0366"
-                                                    tarjetaTitular = "RANDY HUAMAN"
-                                                    vm.limpiarTransaccionTarjeta()
-                                                },
-                                                shape = RoundedCornerShape(8.dp),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                            ) { Text("Visa Demo", fontSize = 11.sp) }
-                                            OutlinedButton(
-                                                onClick = {
-                                                    tarjetaNumero = "5412 7512 3412 3456"
-                                                    tarjetaTitular = "EMANUEL JANAMPA"
-                                                    vm.limpiarTransaccionTarjeta()
-                                                },
-                                                shape = RoundedCornerShape(8.dp),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                            ) { Text("MC Demo", fontSize = 11.sp) }
-                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                tarjetaNumero = "4532 0151 1283 0366"
+                                                tarjetaTitular = "RANDY HUAMAN"
+                                                vm.limpiarTransaccionTarjeta()
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) { Text("Visa Demo", fontSize = 11.sp, maxLines = 1, softWrap = false) }
+                                        OutlinedButton(
+                                            onClick = {
+                                                tarjetaNumero = "5412 7512 3412 3456"
+                                                tarjetaTitular = "EMANUEL JANAMPA"
+                                                vm.limpiarTransaccionTarjeta()
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) { Text("MC Demo", fontSize = 11.sp, maxLines = 1, softWrap = false) }
                                     }
 
                                     OutlinedTextField(
@@ -3327,7 +3685,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                             )
                                         },
                                         enabled = !s.busy && tarjetaNumero.isNotBlank() && tarjetaCvv.length >= 3,
-                                        colors = ButtonDefaults.buttonColors(containerColor = if (s.transaccionTarjeta != null) VerdeEsmeralda else Borgona),
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (s.transaccionTarjeta != null) VerdeEsmeralda else MaterialTheme.colorScheme.primary),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
@@ -3338,15 +3696,15 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
 
                                     s.transaccionTarjeta?.let { trx ->
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(12.dp),
                                             color = c.verdeBg,
-                                            border = BorderStroke(1.dp, VerdeEsmeralda),
+                                            border = BorderStroke(1.dp, c.verde),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                                    Text("OPERACIÓN APROBADA", fontWeight = FontWeight.ExtraBold, color = VerdeEsmeralda, fontSize = 12.sp)
-                                                    Text(trx.marcaFinal, fontWeight = FontWeight.Bold, color = VerdeEsmeralda, fontSize = 12.sp)
+                                                    Text("OPERACIÓN APROBADA", fontWeight = FontWeight.ExtraBold, color = c.verde, fontSize = 12.sp)
+                                                    Text(trx.marcaFinal, fontWeight = FontWeight.Bold, color = c.verde, fontSize = 12.sp)
                                                 }
                                                 Text("Código Autorización: ${trx.codigoAutorizacion.orEmpty()}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
                                                 Text("Tarjeta: **** **** **** ${trx.ultimos4Final} · Ref: ${trx.numeroOperacionFinal}", fontSize = 11.sp, color = c.textoSecundario)
@@ -3357,24 +3715,30 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             }
                         } else if (metodoPago == "Mixto") {
                             Chips(listOf("Yape", "Plin"), mixtoMetodo) { mixtoMetodo = it }
-                            Surface(shape = RoundedCornerShape(12.dp), color = c.contenedor, modifier = Modifier.fillMaxWidth()) {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Pago Dividido / Mixto", fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                                        Text("Pago Dividido / Mixto", fontWeight = FontWeight.Bold, color = c.textoPrincipal, modifier = Modifier.weight(1f))
+                                        Spacer(Modifier.width(8.dp))
                                         OutlinedButton(
                                             onClick = {
-                                                val mitad = (totalCentimos / 2) / 100.0
-                                                val resto = (totalCentimos - (totalCentimos / 2)) / 100.0
-                                                mixtoEfectivo = mitad.toString()
-                                                mixtoDigital = resto.toString()
+                                                val mitadC = totalCentimos / 2
+                                                val restoC = totalCentimos - mitadC
+                                                mixtoEfectivo = "${mitadC / 100}.${(mitadC % 100).toString().padStart(2, '0')}"
+                                                mixtoDigital = "${restoC / 100}.${(restoC % 100).toString().padStart(2, '0')}"
                                                 if (mixtoNumOp.isBlank()) {
                                                     mixtoNumOp = (Clock.System.now().toEpochMilliseconds() % 90000000L + 10000000L).toString()
                                                 }
                                             },
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                         ) {
-                                            Text("Dividir 50% / 50%", fontSize = 11.sp)
+                                            Text("Dividir 50% / 50%", fontSize = 11.sp, maxLines = 1, softWrap = false)
                                         }
                                     }
 
@@ -3422,6 +3786,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
                                         color = if (cuadreOk) c.verdeBg else c.rojoBg,
+                                        border = BorderStroke(1.dp, (if (cuadreOk) c.verde else RojoCoral).copy(alpha = 0.35f)),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
@@ -3433,13 +3798,13 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                                 if (cuadreOk) "Cuadre Exacto: 100% Cubierto" else "Diferencia Pendiente:",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp,
-                                                color = if (cuadreOk) VerdeEsmeralda else RojoCoral
+                                                color = if (cuadreOk) c.verde else RojoCoral
                                             )
                                             Text(
                                                 if (cuadreOk) dinero(totalCentimos) else dineroD(diferencia),
+                                                style = MaterialTheme.typography.titleSmall.tabular(),
                                                 fontWeight = FontWeight.ExtraBold,
-                                                fontSize = 14.sp,
-                                                color = if (cuadreOk) VerdeEsmeralda else RojoCoral
+                                                color = if (cuadreOk) c.verde else RojoCoral
                                             )
                                         }
                                     }
@@ -3532,8 +3897,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 mixtoNumOp = ""
                             },
                             enabled = !s.busy && pagoOk && docOk,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Borgona),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.fillMaxWidth().height(52.dp)
                         ) {
                             Icon(Icons.Default.Receipt, null)
@@ -3553,6 +3918,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     if (cerrarCajaModal) {
         AlertDialog(
             onDismissRequest = { cerrarCajaModal = false },
+            shape = RoundedCornerShape(16.dp),
             title = { Text("Arqueo y Cierre de Turno", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3562,12 +3928,14 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         onValueChange = { efectivoArqueo = it },
                         label = { Text("Efectivo Físico Contado (S/.)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = motivoArqueo,
                         onValueChange = { motivoArqueo = it },
                         label = { Text("Observaciones / Motivo de descuadre") },
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -3579,6 +3947,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         vm.cerrarCaja(real, motivoArqueo)
                         cerrarCajaModal = false
                     },
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RojoCoral)
                 ) { Text("Confirmar Cierre") }
             },
@@ -3590,16 +3959,20 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     if (descuentoModal) {
         AlertDialog(
             onDismissRequest = { descuentoModal = false },
+            shape = RoundedCornerShape(16.dp),
             title = { Text("Aplicar Descuento a Pedido", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Selecciona porcentaje:", style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         listOf("5", "10", "15", "20", "100").forEach { p ->
                             FilterChip(
                                 selected = porcentajeDesc == p,
                                 onClick = { porcentajeDesc = p },
-                                label = { Text(if (p == "100") "Cortesía" else "$p%") }
+                                label = { Text(if (p == "100") "Cortesía" else "$p%", maxLines = 1, softWrap = false) }
                             )
                         }
                     }
@@ -3608,6 +3981,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         onValueChange = { motivoDesc = it },
                         label = { Text("Motivo del Descuento") },
                         placeholder = { Text("Ej. Cliente frecuente / Promoción") },
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -3620,7 +3994,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         }
                         descuentoModal = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) { Text("Aplicar") }
             },
             dismissButton = { TextButton(onClick = { descuentoModal = false }) { Text("Cancelar") } }
@@ -3630,6 +4005,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     if (anularModal) {
         AlertDialog(
             onDismissRequest = { anularModal = false },
+            shape = RoundedCornerShape(16.dp),
             title = { Text("Anular Pedido (Administrador)", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3639,6 +4015,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         onValueChange = { motivoAnular = it },
                         label = { Text("Motivo de anulación *") },
                         singleLine = false,
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -3653,6 +4030,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         anularModal = false
                     },
                     enabled = motivoAnular.isNotBlank(),
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RojoCoral)
                 ) { Text("Confirmar Anulación") }
             },
@@ -3664,7 +4042,7 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
     s.comprobanteEmitido?.let { comp ->
         val aceptado = comp.estadoFinal == "ACEPTADO"
         val rechazado = comp.estadoFinal == "RECHAZADO"
-        val colorEstado = if (aceptado) VerdeEsmeralda else if (rechazado) RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo
+        val colorEstado = if (aceptado) c.verde else if (rechazado) RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo
         var telReenvio by rememberSaveable(comp.idComprobante) { mutableStateOf(telefonoWhatsApp) }
         var selloVisible by remember(comp.idComprobante) { mutableStateOf(false) }
         LaunchedEffect(comp.idComprobante) { selloVisible = true }
@@ -3676,27 +4054,25 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
 
         AlertDialog(
             onDismissRequest = { vm.cerrarComprobanteModal() },
+            shape = RoundedCornerShape(16.dp),
             title = {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text("Comprobante Electrónico", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text(comp.numeroFinal, fontSize = 12.sp, color = c.textoSecundario, fontWeight = FontWeight.Bold)
+                        Text(comp.numeroFinal, style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoSecundario, fontWeight = FontWeight.Bold)
                     }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (aceptado) c.verdeBg else if (rechazado) c.rojoBg else c.ambarBg,
+                    Spacer(Modifier.width(8.dp))
+                    EstadoPill(
+                        texto = if (aceptado) "ACEPTADO" else if (rechazado) "RECHAZADO" else "PENDIENTE",
+                        colorContenido = colorEstado,
+                        colorFondo = if (aceptado) c.verdeBg else if (rechazado) c.rojoBg else c.ambarBg,
+                        icono = if (aceptado) Icons.Default.Verified else Icons.Default.Info,
                         modifier = Modifier.graphicsLayer { scaleX = escalaSello; scaleY = escalaSello }
-                    ) {
-                        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(if (aceptado) Icons.Default.Verified else Icons.Default.Info, null, tint = colorEstado, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (aceptado) "ACEPTADO" else if (rechazado) "RECHAZADO" else "PENDIENTE", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = colorEstado)
-                        }
-                    }
+                    )
                 }
             },
             text = {
@@ -3706,7 +4082,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                 ) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = c.contenedor,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -3715,39 +4092,51 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(comp.razonSocialEmisor ?: "Wendy’s Food", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = c.textoPrincipal)
-                            Text("RUC: ${comp.rucEmisor.orEmpty()}", fontSize = 11.sp, color = c.textoSecundario)
+                            Text("RUC: ${comp.rucEmisor.orEmpty()}", style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoSecundario)
                             Text("Ambiente de pruebas SUNAT Beta", fontSize = 10.sp, color = c.textoSecundario)
                         }
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = c.superficie,
-                        border = BorderStroke(1.dp, c.borde),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Tipo:", fontSize = 12.sp, color = c.textoSecundario)
+                                Spacer(Modifier.width(8.dp))
                                 Text(comp.tipoComprobante, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Serie y Número:", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(comp.numeroFinal, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
+                                Spacer(Modifier.width(8.dp))
+                                Text(comp.numeroFinal, style = MaterialTheme.typography.bodySmall.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                             }
                             comp.receptorFinal?.let { rec ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                                     Text("Cliente:", fontSize = 12.sp, color = c.textoSecundario)
-                                    Text("${comp.numeroDocumentoReceptor.orEmpty()} ${rec}".trim(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "${comp.numeroDocumentoReceptor.orEmpty()} $rec".trim(),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = c.textoPrincipal,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Fecha de Emisión:", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(formatearHoraLima(comp.fechaEmision), fontSize = 11.sp, color = c.textoPrincipal)
+                                Spacer(Modifier.width(8.dp))
+                                Text(formatearHoraLima(comp.fechaEmision), style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoPrincipal)
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Estado SUNAT:", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(comp.estadoFinal.replace("_", " "), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (comp.estadoFinal == "ACEPTADO") VerdeEsmeralda else if (comp.estadoFinal == "RECHAZADO") RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo)
+                                Spacer(Modifier.width(8.dp))
+                                Text(comp.estadoFinal.replace("_", " "), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (comp.estadoFinal == "ACEPTADO") c.verde else if (comp.estadoFinal == "RECHAZADO") RojoCoral else if (s.modoOscuro) AmbarDorado else AmbarProfundo)
                             }
                         }
                     }
@@ -3755,7 +4144,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                     // Representación del Código QR para Tiquetera
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = c.contenedor,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -3763,36 +4153,36 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(if (comp.estadoFinal == "ACEPTADO") Icons.Default.Verified else Icons.AutoMirrored.Filled.ReceiptLong, null, modifier = Modifier.size(44.dp), tint = if (s.modoOscuro) AmbarDorado else Borgona)
+                            Icon(if (comp.estadoFinal == "ACEPTADO") Icons.Default.Verified else Icons.AutoMirrored.Filled.ReceiptLong, null, modifier = Modifier.size(44.dp), tint = c.acento)
                             Text(comp.descripcionFinal, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.textoPrincipal, textAlign = TextAlign.Center)
                             Text(if (comp.hashFinal.isBlank()) "Firma digital pendiente" else "Hash: ${comp.hashFinal.take(20)}…", fontSize = 10.sp, color = c.textoSecundario)
                         }
                     }
 
                     s.pendientesEmision.firstOrNull { it.idPago == comp.idPago }?.let { solicitud ->
-                        OutlinedButton(onClick = { vm.recuperarComprobante(solicitud) }, enabled = !s.busy, modifier = Modifier.fillMaxWidth()) { Text("Reintentar emisión SUNAT") }
+                        OutlinedButton(onClick = { vm.recuperarComprobante(solicitud) }, enabled = !s.busy, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) { Text("Reintentar emisión SUNAT", maxLines = 1, softWrap = false) }
                     }
 
                     // Cuadro de Totales
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = c.superficie,
-                        border = BorderStroke(1.dp, c.borde),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Op. Gravada:", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(dineroD(comp.totalGravado), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
+                                Text(dineroD(comp.totalGravado), style = MaterialTheme.typography.bodySmall.tabular(), fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("I.G.V. (18%):", fontSize = 12.sp, color = c.textoSecundario)
-                                Text(dineroD(comp.totalIgv), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
+                                Text(dineroD(comp.totalIgv), style = MaterialTheme.typography.bodySmall.tabular(), fontWeight = FontWeight.SemiBold, color = c.textoPrincipal)
                             }
-                            HorizontalDivider(color = c.borde)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("TOTAL A PAGAR:", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = c.textoPrincipal)
-                                Text(dineroD(comp.totalImporte), fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = VerdeEsmeralda)
+                                Text(dineroD(comp.totalImporte), style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.ExtraBold, color = c.verde)
                             }
                         }
                     }
@@ -3800,8 +4190,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                     // Sección de envío real PDF 80mm por WhatsApp (Green-API)
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = c.superficie,
-                        border = BorderStroke(1.dp, c.borde),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3815,11 +4205,11 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     else -> c.rojoBg
                                 }
                                 val fg = when {
-                                    esOk -> VerdeEsmeralda
+                                    esOk -> c.verde
                                     esPend -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
                                     else -> RojoCoral
                                 }
-                                Surface(shape = RoundedCornerShape(8.dp), color = bg, modifier = Modifier.fillMaxWidth()) {
+                                Surface(shape = RoundedCornerShape(10.dp), color = bg, modifier = Modifier.fillMaxWidth()) {
                                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Icon(
                                             when {
@@ -3845,7 +4235,8 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                 OutlinedTextField(
                                     value = telReenvio,
                                     onValueChange = { telReenvio = it.filter { ch -> ch.isDigit() || ch == '+' }.take(15) },
-                                    label = { Text("Celular (ej. 987654321)") },
+                                    label = { Text("N° Celular", maxLines = 1, softWrap = false) },
+                                    placeholder = { Text("987654321") },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     shape = RoundedCornerShape(10.dp),
@@ -3855,38 +4246,46 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                                     onClick = { vm.ticketWhatsApp(comp.idPedido, telReenvio) },
                                     enabled = !s.busy && telReenvio.count(Char::isDigit) >= 9,
                                     shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = VerdeEsmeralda),
+                                    colors = ButtonDefaults.buttonColors(containerColor = VerdeEsmeralda, contentColor = BlancoPuro),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
                                     Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("PDF", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("PDF", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
                     }
 
+                    s.error?.let { err ->
+                        Notice(text = err, error = true, onClose = vm::limpiarAvisos)
+                    }
+                    s.mensaje?.takeIf { it.contains("PDF", ignoreCase = true) }?.let { msg ->
+                        Notice(text = msg, error = false, onClose = vm::limpiarAvisos)
+                    }
                     // Acciones PDF 80mm reales
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = { vm.abrirPdfComprobante(comp.idComprobante, comp.numeroFinal, compartir = false) },
                             enabled = !s.busy && comp.idComprobante > 0L,
                             shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Print, null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Print, null, modifier = Modifier.size(15.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Ver PDF 80mm", fontSize = 11.sp)
+                            Text("Ver PDF", fontSize = 11.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                         OutlinedButton(
                             onClick = { vm.abrirPdfComprobante(comp.idComprobante, comp.numeroFinal, compartir = true) },
                             enabled = !s.busy && comp.idComprobante > 0L,
                             shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Share, null, modifier = Modifier.size(15.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Compartir PDF", fontSize = 11.sp)
+                            Text("Compartir", fontSize = 11.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -3897,13 +4296,23 @@ private fun CajaScreen(s: PosUiState, vm: PosViewModel) {
                         vm.limpiarTransaccionTarjeta()
                         vm.cerrarComprobanteModal()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Finalizar Venta")
                 }
             }
+        )
+    }
+    s.pdfVistaPrevia?.let { pdf ->
+        VisorPdfComprobante(
+            nombreArchivo = pdf.nombre,
+            bytes = pdf.bytes,
+            onCerrar = vm::cerrarVistaPreviaPdf,
+            onAbrirExterno = { vm.abrirPdfExterno(compartir = false) },
+            onCompartir = { vm.abrirPdfExterno(compartir = true) }
         )
     }
 }
@@ -3926,8 +4335,8 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = { nuevoInsumoModal = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
@@ -3936,20 +4345,20 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
             OutlinedButton(
                 onClick = { compraModal = true },
                 enabled = s.insumos.isNotEmpty() && !s.busy,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Icon(Icons.Default.ShoppingBag, null, modifier = Modifier.size(16.dp), tint = VerdeEsmeralda)
+                Icon(Icons.Default.ShoppingBag, null, modifier = Modifier.size(16.dp), tint = c.verde)
                 Spacer(Modifier.width(4.dp))
-                Text("Registrar Compra", fontSize = 12.sp, color = VerdeEsmeralda)
+                Text("Registrar Compra", fontSize = 12.sp, color = c.verde, maxLines = 1, softWrap = false)
             }
             OutlinedButton(
                 onClick = { mermaModal = true },
                 enabled = s.insumos.isNotEmpty() && !s.busy,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.TrendingDown, null, modifier = Modifier.size(16.dp), tint = RojoCoral)
                 Spacer(Modifier.width(4.dp))
-                Text("Registrar Merma", fontSize = 12.sp, color = RojoCoral)
+                Text("Registrar Merma", fontSize = 12.sp, color = RojoCoral, maxLines = 1, softWrap = false)
             }
         }
 
@@ -3958,22 +4367,32 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = if (bajoStock > 0) c.rojoBg else c.verdeBg,
-            border = BorderStroke(1.dp, if (bajoStock > 0) RojoCoral.copy(alpha = 0.3f) else VerdeEsmeralda.copy(alpha = 0.3f)),
+            border = BorderStroke(1.dp, if (bajoStock > 0) RojoCoral.copy(alpha = 0.35f) else c.verde.copy(alpha = 0.35f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    if (bajoStock > 0) Icons.Default.Warning else Icons.Default.CheckCircle,
-                    null,
-                    tint = if (bajoStock > 0) RojoCoral else VerdeEsmeralda
-                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (bajoStock > 0) Icons.Default.Warning else Icons.Default.CheckCircle,
+                            null,
+                            tint = if (bajoStock > 0) RojoCoral else c.verde,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 Column {
                     Text(
                         if (bajoStock > 0) "$bajoStock insumos en nivel crítico o bajo" else "Stock en niveles óptimos",
+                        style = MaterialTheme.typography.titleSmall.tabular(),
                         fontWeight = FontWeight.Bold,
-                        color = if (bajoStock > 0) RojoCoral else VerdeEsmeralda
+                        color = if (bajoStock > 0) RojoCoral else c.verde
                     )
-                    Text("Total monitoreado: ${s.insumos.size} materias primas", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                    Text("Total monitoreado: ${s.insumos.size} materias primas", style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoSecundario)
                 }
             }
         }
@@ -3982,9 +4401,9 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
             value = buscar,
             onValueChange = { buscar = it },
             label = { Text("Buscar insumo (ej. Pollo, Papa huayro, Aceite)") },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = Borgona) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = c.acento) },
             singleLine = true,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -4002,40 +4421,36 @@ private fun AlmacenScreen(s: PosUiState, vm: PosViewModel) {
 
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = c.superficie,
-                        border = BorderStroke(1.dp, if (esCritico) RojoCoral.copy(alpha = 0.5f) else c.borde),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, if (esCritico) RojoCoral.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant),
                         shadowElevation = 2.dp,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Column {
+                                Column(Modifier.weight(1f)) {
                                     Text(ins.nombre, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = c.textoPrincipal)
-                                    Text("Cód: ${ins.codigo} · Costo Prom: S/ ${ins.costoUnitario}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
+                                    Text("Cód: ${ins.codigo} · Costo Prom: S/ ${ins.costoUnitario}", style = MaterialTheme.typography.bodySmall.tabular(), color = c.textoSecundario)
                                 }
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (esCritico) c.rojoBg else c.verdeBg
-                                ) {
-                                    Text(
-                                        "${ins.stockActual} ${ins.unidadMedida}",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = if (esCritico) RojoCoral else VerdeEsmeralda
-                                    )
-                                }
+                                Spacer(Modifier.width(8.dp))
+                                EstadoPill(
+                                    texto = "${ins.stockActual} ${ins.unidadMedida}",
+                                    colorContenido = if (esCritico) RojoCoral else c.verde,
+                                    colorFondo = if (esCritico) c.rojoBg else c.verdeBg,
+                                    dotColor = if (esCritico) RojoCoral else c.verde
+                                )
                             }
 
                             LinearProgressIndicator(
                                 progress = { ratio },
                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                color = if (esCritico) RojoCoral else VerdeEsmeralda,
-                                trackColor = c.borde
+                                color = if (esCritico) RojoCoral else c.verde,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             )
 
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Mínimo: ${ins.stockMinimo} ${ins.unidadMedida}", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
-                                Text(if (esCritico) "¡STOCK CRÍTICO!" else "OK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (esCritico) RojoCoral else VerdeEsmeralda)
+                                Text("Mínimo: ${ins.stockMinimo} ${ins.unidadMedida}", style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoSecundario)
+                                Text(if (esCritico) "¡STOCK CRÍTICO!" else "OK", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (esCritico) RojoCoral else c.verde)
                             }
                         }
                     }
@@ -4079,6 +4494,7 @@ private fun CompraInsumoDialog(
 
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Ingreso por Compra", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4100,11 +4516,11 @@ private fun CompraInsumoDialog(
                         }
                     }
                 }
-                OutlinedTextField(proveedor, { proveedor = it }, label = { Text("Proveedor *") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(doc, { doc = it }, label = { Text("N° Factura / Guía") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad (${seleccionado.unidadMedida}) *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(costo, { costo = it }, label = { Text("Costo Unitario S/. *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(obs, { obs = it }, label = { Text("Observación (opcional)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(proveedor, { proveedor = it }, label = { Text("Proveedor *") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(doc, { doc = it }, label = { Text("N° Factura / Guía") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad (${seleccionado.unidadMedida}) *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(costo, { costo = it }, label = { Text("Costo Unitario S/. *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(obs, { obs = it }, label = { Text("Observación (opcional)") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -4113,7 +4529,8 @@ private fun CompraInsumoDialog(
             Button(
                 onClick = { guardar(proveedor, doc, seleccionado.idInsumo, cantD, costD, obs) },
                 enabled = proveedor.isNotBlank() && cantD > 0 && costD >= 0,
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) { Text("Registrar Ingreso") }
         },
         dismissButton = { TextButton(onClick = cerrar) { Text("Cancelar") } }
@@ -4133,6 +4550,7 @@ private fun MermaInsumoDialog(
 
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Registro de Merma", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4148,9 +4566,9 @@ private fun MermaInsumoDialog(
                         }
                     }
                 }
-                OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad mermada *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo (ej. Vencido, Derrame) *") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(obs, { obs = it }, label = { Text("Detalle adicional") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(cantidad, { cantidad = it }, label = { Text("Cantidad mermada *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo (ej. Vencido, Derrame) *") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(obs, { obs = it }, label = { Text("Detalle adicional") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -4158,6 +4576,7 @@ private fun MermaInsumoDialog(
             Button(
                 onClick = { guardar(seleccionado.idInsumo, cantD, motivo, obs) },
                 enabled = motivo.isNotBlank() && cantD > 0,
+                shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = RojoCoral)
             ) { Text("Descontar Stock") }
         },
@@ -4176,15 +4595,16 @@ private fun NuevoInsumoDialog(cerrar: () -> Unit, crear: (String, String, String
 
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Registrar Insumo de Cocina", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(codigo, { codigo = it }, label = { Text("Código (ej. INS-POL-01)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(nombre, { nombre = it }, label = { Text("Nombre del insumo") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(unidad, { unidad = it }, label = { Text("Unidad de Medida (kg, lt, und)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(stock, { stock = it }, label = { Text("Stock Inicial") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(minimo, { minimo = it }, label = { Text("Stock Mínimo de Alerta") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(costo, { costo = it }, label = { Text("Costo Unitario (S/.)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(codigo, { codigo = it }, label = { Text("Código (ej. INS-POL-01)") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(nombre, { nombre = it }, label = { Text("Nombre del insumo") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(unidad, { unidad = it }, label = { Text("Unidad de Medida (kg, lt, und)") }, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(stock, { stock = it }, label = { Text("Stock Inicial") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(minimo, { minimo = it }, label = { Text("Stock Mínimo de Alerta") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(costo, { costo = it }, label = { Text("Costo Unitario (S/.)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -4193,7 +4613,8 @@ private fun NuevoInsumoDialog(cerrar: () -> Unit, crear: (String, String, String
                     crear(codigo, nombre, unidad, stock.toDoubleOrNull() ?: 0.0, minimo.toDoubleOrNull() ?: 0.0, costo.toDoubleOrNull() ?: 0.0)
                 },
                 enabled = codigo.isNotBlank() && nombre.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) { Text("Guardar Insumo") }
         },
         dismissButton = { TextButton(onClick = cerrar) { Text("Cancelar") } }
@@ -4215,8 +4636,8 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
 
         PrimaryTabRow(
             selectedTabIndex = if (tabReporte == "Horas") 0 else if (tabReporte == "Platos") 1 else 2,
-            containerColor = c.superficie,
-            contentColor = Borgona
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = c.acento
         ) {
             Tab(selected = tabReporte == "Horas", onClick = { tabReporte = "Horas" }, text = { Text("Ventas x Hora") })
             Tab(selected = tabReporte == "Platos", onClick = { tabReporte = "Platos" }, text = { Text("Top Platos") })
@@ -4226,12 +4647,12 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
         when (tabReporte) {
             "Horas" -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
-                    // 1. Tarjeta visual "Curva de Flujo Operativo" (Google Stitch)
+                    // 1. Tarjeta visual "Curva de Flujo Operativo" (Bistro & Gourmet M3)
                     item {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = c.superficie,
-                            border = BorderStroke(1.dp, c.borde),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             shadowElevation = 2.dp,
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -4242,10 +4663,18 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Icon(Icons.AutoMirrored.Filled.ShowChart, null, tint = if (s.modoOscuro) AmbarDorado else Borgona, modifier = Modifier.size(22.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = c.acentoSuave,
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.AutoMirrored.Filled.ShowChart, null, tint = c.acento, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
                                         Text("Curva de Flujo Operativo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = c.textoPrincipal)
                                     }
-                                    Text("Hora Perú (UTC-5)", style = MaterialTheme.typography.labelSmall, color = if (s.modoOscuro) AmbarDorado else AmbarProfundo, fontWeight = FontWeight.Bold)
+                                    Text("Hora Perú (UTC-5)", style = MaterialTheme.typography.labelSmall, color = c.acento, fontWeight = FontWeight.Bold)
                                 }
 
                                 val ventasPorHoraMap = s.ventasPorHora.associateBy { it.hora }
@@ -4271,13 +4700,13 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                         )
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             if (esPicoReal) {
-                                                Surface(shape = CircleShape, color = Borgona, modifier = Modifier.size(22.dp)) {
+                                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp)) {
                                                     Box(contentAlignment = Alignment.Center) {
                                                         Icon(Icons.Default.Whatshot, null, tint = BlancoPuro, modifier = Modifier.size(13.dp))
                                                     }
                                                 }
                                             } else if (vh != null) {
-                                                Text("${vh.cantidadPedidos}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.textoSecundario)
+                                                Text("${vh.cantidadPedidos}", style = MaterialTheme.typography.labelSmall.tabular(), fontWeight = FontWeight.Bold, color = c.textoSecundario)
                                             } else {
                                                 Spacer(Modifier.height(14.dp))
                                             }
@@ -4288,29 +4717,29 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         when {
-                                                            esPicoReal -> Borgona
+                                                            esPicoReal -> MaterialTheme.colorScheme.primary
                                                             vh != null -> if (s.modoOscuro) AmbarDorado else AmbarProfundo
-                                                            else -> c.borde
+                                                            else -> MaterialTheme.colorScheme.outlineVariant
                                                         }
                                                     )
                                             )
                                             Text(
                                                 "${hora.toString().padStart(2, '0')}h",
-                                                style = MaterialTheme.typography.labelSmall,
+                                                style = MaterialTheme.typography.labelSmall.tabular(),
                                                 fontWeight = if (esPicoReal || vh != null) FontWeight.ExtraBold else FontWeight.Medium,
-                                                color = if (esPicoReal) (if (s.modoOscuro) AmbarDorado else Borgona) else c.textoSecundario
+                                                color = if (esPicoReal) c.acento else c.textoSecundario
                                             )
                                         }
                                     }
                                 }
 
-                                HorizontalDivider(color = c.borde)
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                 val totalDia = s.ventasPorHora.sumOf { it.totalVentas }
                                 val pedidosDia = s.ventasPorHora.sumOf { it.cantidadPedidos }
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Pedidos hoy: $pedidosDia", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = c.textoSecundario)
-                                    Text("Facturado hoy: ${dineroD(totalDia)}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = VerdeEsmeralda)
+                                    Text("Pedidos hoy: $pedidosDia", style = MaterialTheme.typography.labelSmall.tabular(), fontWeight = FontWeight.Bold, color = c.textoSecundario)
+                                    Text("Facturado hoy: ${dineroD(totalDia)}", style = MaterialTheme.typography.labelSmall.tabular(), fontWeight = FontWeight.ExtraBold, color = c.verde)
                                 }
                             }
                         }
@@ -4324,9 +4753,9 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                     } else {
                         items(s.ventasPorHora) { vh ->
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = c.superficie,
-                                border = BorderStroke(1.dp, c.borde),
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
@@ -4335,12 +4764,12 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Icon(Icons.Default.Schedule, null, tint = if (s.modoOscuro) AmbarDorado else Borgona, modifier = Modifier.size(20.dp))
-                                        Text("${vh.hora.toString().padStart(2, '0')}:00 hrs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge, color = c.textoPrincipal)
+                                        Icon(Icons.Default.Schedule, null, tint = c.acento, modifier = Modifier.size(20.dp))
+                                        Text("${vh.hora.toString().padStart(2, '0')}:00 hrs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge.tabular(), color = c.textoPrincipal)
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
-                                        Text(dineroD(vh.totalVentas), fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
-                                        Text("${vh.cantidadPedidos} pedidos", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
+                                        Text(dineroD(vh.totalVentas), style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.ExtraBold, color = c.acento)
+                                        Text("${vh.cantidadPedidos} pedidos", style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoSecundario)
                                     }
                                 }
                             }
@@ -4356,23 +4785,28 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
                         itemsIndexed(s.platosPopulares) { index, pp ->
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = c.superficie,
-                                border = BorderStroke(1.dp, c.borde),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("#${index + 1} ${pp.nombrePlato}", fontWeight = FontWeight.Bold, color = c.textoPrincipal)
-                                        Text("${pp.cantidadVendida} unid.", fontWeight = FontWeight.ExtraBold, color = if (s.modoOscuro) AmbarDorado else Borgona)
+                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text("#${index + 1} ${pp.nombrePlato}", style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.Bold, color = c.textoPrincipal, modifier = Modifier.weight(1f))
+                                        EstadoPill(
+                                            texto = "${pp.cantidadVendida} unid.",
+                                            colorContenido = c.acento,
+                                            colorFondo = c.acentoSuave,
+                                            borde = c.acento.copy(alpha = 0.25f)
+                                        )
                                     }
                                     LinearProgressIndicator(
                                         progress = { (pp.cantidadVendida.toFloat() / maxCantidad).coerceIn(0f, 1f) },
                                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                        color = if (s.modoOscuro) AmbarDorado else Borgona,
-                                        trackColor = c.contenedor
+                                        color = c.acento,
+                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                     )
-                                    Text("Facturado: ${dineroD(pp.totalRecaudado)}", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
+                                    Text("Facturado: ${dineroD(pp.totalRecaudado)}", style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoSecundario)
                                 }
                             }
                         }
@@ -4389,15 +4823,15 @@ private fun ReportesScreen(s: PosUiState, vm: PosViewModel) {
                             val actorResuelto = s.usuarios.find { it.idUsuario.toString() == aud.usuario }
                                 ?.let { "${it.codigoTrabajador} · ${it.nombreCompleto}" } ?: aud.usuario
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = c.superficie,
-                                border = BorderStroke(1.dp, c.borde),
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(aud.accion, fontWeight = FontWeight.Bold, color = if (s.modoOscuro) AmbarDorado else Borgona)
-                                        Text(formatearHoraLima(aud.fecha), style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text(aud.accion, fontWeight = FontWeight.Bold, color = c.acento)
+                                        Text(formatearHoraLima(aud.fecha), style = MaterialTheme.typography.labelSmall.tabular(), color = c.textoSecundario)
                                     }
                                     Text("${aud.codigoPedido} · Por: $actorResuelto", style = MaterialTheme.typography.bodySmall, color = c.textoPrincipal)
                                     if (aud.motivo.isNotBlank()) {
@@ -4434,8 +4868,8 @@ private fun Usuarios(s: PosUiState, vm: PosViewModel) {
             Button(
                 onClick = { crear = true },
                 enabled = !s.busy,
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
@@ -4447,29 +4881,23 @@ private fun Usuarios(s: PosUiState, vm: PosViewModel) {
             items(s.usuarios, key = { it.idUsuario }) { u ->
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = c.superficie,
-                    border = BorderStroke(1.dp, c.borde),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 2.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 Text(u.nombreCompleto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.textoPrincipal)
                                 Text("${u.codigoTrabajador} · ${u.rol}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
                             }
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (u.activo) c.verdeBg else c.rojoBg
-                            ) {
-                                Text(
-                                    if (u.activo) "ACTIVO" else "INACTIVO",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (u.activo) VerdeEsmeralda else RojoCoral
-                                )
-                            }
+                            EstadoPill(
+                                texto = if (u.activo) "ACTIVO" else "INACTIVO",
+                                colorContenido = if (u.activo) c.verde else RojoCoral,
+                                colorFondo = if (u.activo) c.verdeBg else c.rojoBg,
+                                dotColor = if (u.activo) c.verde else RojoCoral
+                            )
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -4483,7 +4911,7 @@ private fun Usuarios(s: PosUiState, vm: PosViewModel) {
                                 onClick = { confirmar = u },
                                 enabled = !s.busy && u.idUsuario != s.sesion?.usuario?.idUsuario
                             ) {
-                                Text(if (u.activo) "Desactivar" else "Activar", color = if (u.activo) RojoCoral else VerdeEsmeralda, fontWeight = FontWeight.Bold)
+                                Text(if (u.activo) "Desactivar" else "Activar", color = if (u.activo) RojoCoral else c.verde, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -4521,13 +4949,14 @@ private fun UsuarioDialog(cerrar: () -> Unit, crear: (String, String, String, St
 
     AlertDialog(
         onDismissRequest = cerrar,
+        shape = RoundedCornerShape(16.dp),
         title = { Text("Registrar Colaborador", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(codigo, { codigo = it.uppercase().take(30) }, label = { Text("Código (ej. MOZ003, CAJ002)") }, singleLine = true)
-                OutlinedTextField(nombre, { nombre = it.take(120) }, label = { Text("Nombre Completo") }, singleLine = true)
-                OutlinedTextField(correo, { correo = it.take(160) }, label = { Text("Correo (opcional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(4) }, label = { Text("PIN de 4 dígitos") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                OutlinedTextField(codigo, { codigo = it.uppercase().take(30) }, label = { Text("Código (ej. MOZ003, CAJ002)") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(nombre, { nombre = it.take(120) }, label = { Text("Nombre Completo") }, singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(correo, { correo = it.take(160) }, label = { Text("Correo (opcional)") }, singleLine = true, shape = RoundedCornerShape(10.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(4) }, label = { Text("PIN de 4 dígitos") }, singleLine = true, shape = RoundedCornerShape(10.dp), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
                 Text("Rol en el restaurante:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 listOf("MOZO", "COCINERO", "CAJERO", "ALMACENERO", "ADMINISTRADOR").forEach { r ->
                     Row(Modifier.fillMaxWidth().clickable { rol = r }, verticalAlignment = Alignment.CenterVertically) {
@@ -4541,7 +4970,8 @@ private fun UsuarioDialog(cerrar: () -> Unit, crear: (String, String, String, St
             Button(
                 onClick = { crear(codigo, nombre, correo, pin, rol) },
                 enabled = codigo.isNotBlank() && nombre.isNotBlank() && pin.length == 4,
-                colors = ButtonDefaults.buttonColors(containerColor = Borgona)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) { Text("Crear Usuario") }
         },
         dismissButton = { TextButton(onClick = cerrar) { Text("Cancelar") } }
@@ -4554,16 +4984,17 @@ private fun UsuarioDialog(cerrar: () -> Unit, crear: (String, String, String, St
 
 @Composable
 private fun Cuenta(s: PosUiState, vm: PosViewModel) {
+    val c = LocalColores.current
     var salir by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Heading("Mi Perfil", s.sesion?.usuario?.nombreCompleto.orEmpty())
 
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, LocalColores.current.borde),
-            shadowElevation = 3.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 2.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -4573,17 +5004,17 @@ private fun Cuenta(s: PosUiState, vm: PosViewModel) {
                     }
                     Column {
                         Text(s.sesion?.usuario?.nombreCompleto.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Cód: ${s.sesion?.usuario?.codigoTrabajador} · Rol: ${s.rol}", style = MaterialTheme.typography.bodySmall, color = LocalColores.current.textoSecundario)
+                        Text("Cód: ${s.sesion?.usuario?.codigoTrabajador} · Rol: ${s.rol}", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
                     }
                 }
 
-                HorizontalDivider(color = LocalColores.current.borde)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 // Ajuste rápido de Modo Oscuro en perfil
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, LocalColores.current.borde),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth().clickable { vm.toggleModoOscuro() }
                 ) {
                     Row(
@@ -4593,21 +5024,21 @@ private fun Cuenta(s: PosUiState, vm: PosViewModel) {
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = if (s.modoOscuro) AmbarDorado.copy(alpha = 0.2f) else Borgona.copy(alpha = 0.1f),
+                            color = c.acentoSuave,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     if (s.modoOscuro) Icons.Default.DarkMode else Icons.Default.LightMode,
                                     contentDescription = null,
-                                    tint = if (s.modoOscuro) AmbarDorado else Borgona,
+                                    tint = c.acento,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
                         Column(Modifier.weight(1f)) {
                             Text("Tema Visual", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                            Text(if (s.modoOscuro) "Modo Oscuro (KDS & Noche)" else "Modo Claro Bistro", style = MaterialTheme.typography.labelSmall, color = LocalColores.current.textoSecundario)
+                            Text(if (s.modoOscuro) "Modo Oscuro (KDS & Noche)" else "Modo Claro Bistro", style = MaterialTheme.typography.labelSmall, color = c.textoSecundario)
                         }
                         Switch(
                             checked = s.modoOscuro,
@@ -4616,21 +5047,22 @@ private fun Cuenta(s: PosUiState, vm: PosViewModel) {
                                 checkedThumbColor = AmbarDorado,
                                 checkedTrackColor = Borgona,
                                 uncheckedThumbColor = BlancoPuro,
-                                uncheckedTrackColor = LocalColores.current.borde
+                                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant
                             )
                         )
                     }
                 }
 
-                Text("Servidor Gateway: ${s.servidor.ifBlank { "http://localhost:8080" }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                Text("Sistema NullPointer POS con arquitectura limpia para Sprints 1, 2 y 3.", style = MaterialTheme.typography.bodySmall, color = LocalColores.current.textoSecundario)
+                Text("Servidor Gateway: ${s.servidor.ifBlank { "http://10.40.79.37:8080" }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                Text("Sistema NullPointer POS con arquitectura limpia para Sprints 1, 2 y 3.", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
             }
         }
 
         OutlinedButton(
             onClick = { salir = true },
             enabled = !s.busy,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, RojoCoral.copy(alpha = 0.45f)),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
             Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = RojoCoral)
@@ -4638,12 +5070,17 @@ private fun Cuenta(s: PosUiState, vm: PosViewModel) {
             Text("Cerrar Sesión del Dispositivo", color = RojoCoral, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(Modifier.height(10.dp))
-        Surface(shape = RoundedCornerShape(12.dp), color = LocalColores.current.contenedor, modifier = Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(6.dp))
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Créditos & Autoría", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge, color = Borgona)
+                Text("Créditos & Autoría", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge, color = c.acento)
                 Text("Randy Huamán (Célula G5 - UPeU)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                Text("NullPointer POS · Wendy's Food", style = MaterialTheme.typography.bodySmall, color = LocalColores.current.textoSecundario)
+                Text("NullPointer POS · Wendy's Food", style = MaterialTheme.typography.bodySmall, color = c.textoSecundario)
             }
         }
     }

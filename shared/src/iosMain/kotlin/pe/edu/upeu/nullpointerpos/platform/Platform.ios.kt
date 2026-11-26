@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.darwin.Darwin
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import pe.edu.upeu.nullpointerpos.theme.AmbarDorado
 import pe.edu.upeu.nullpointerpos.theme.Borgona
 import platform.Foundation.NSUserDefaults
@@ -22,7 +24,11 @@ actual fun preferencias(): Preferencias = object : Preferencias {
 }
 actual fun motorHttp(): HttpClientEngine = Darwin.create()
 actual fun servidorInicial() = "http://localhost:8080"
-actual fun avisarPedido() { AudioServicesPlaySystemSound(1007u) }
+actual fun prepararNotificaciones() {}
+actual fun avisarPedido(titulo: String, detalle: String, idPedido: Long) { AudioServicesPlaySystemSound(1007u) }
+actual fun avisarPedidoListo(titulo: String, detalle: String, idPedido: Long) { AudioServicesPlaySystemSound(1008u) }
+actual fun destinosNotificacion(): Flow<String> = emptyFlow()
+actual fun limpiarDestinoNotificacion() {}
 actual fun abrirPdfLocal(nombreArchivo: String, bytes: ByteArray, compartir: Boolean): String? =
     "Vista/descarga directa de PDF disponible en Android."
 actual fun hayConexionRed(): Boolean = true
@@ -37,3 +43,12 @@ actual fun WendysLogo(modifier: Modifier) {
 
 @Composable
 actual fun ActualizarBarrasSistema(oscuro: Boolean) {}
+
+@Composable
+actual fun VisorPdfComprobante(
+    nombreArchivo: String,
+    bytes: ByteArray,
+    onCerrar: () -> Unit,
+    onAbrirExterno: () -> Unit,
+    onCompartir: () -> Unit
+) {}

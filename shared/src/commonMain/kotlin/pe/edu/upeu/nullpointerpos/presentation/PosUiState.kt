@@ -4,6 +4,12 @@ package pe.edu.upeu.nullpointerpos.presentation
 
 import pe.edu.upeu.nullpointerpos.domain.model.*
 
+data class PdfComprobanteUi(val nombre: String, val bytes: ByteArray) {
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is PdfComprobanteUi && nombre == other.nombre && bytes.contentEquals(other.bytes))
+    override fun hashCode(): Int = 31 * nombre.hashCode() + bytes.contentHashCode()
+}
+
 data class PosUiState(
     val servidor: String = "",
     val sesion: Sesion? = null,
@@ -35,6 +41,7 @@ data class PosUiState(
     val socketConectado: Boolean = false,
     val cocinaActualizada: Long? = null,
     val nuevoPedidoCocinaAviso: Pedido? = null,
+    val pedidoListoAviso: Pedido? = null,
 
     // Caja y Cobros (Sprint 2 y 3)
     val pendientesCobro: List<Pedido> = emptyList(),
@@ -46,6 +53,7 @@ data class PosUiState(
     val transaccionTarjeta: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaSimuladorTarjeta? = null,
     val comprobanteEmitido: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaComprobanteSunat? = null,
     val whatsappResultado: pe.edu.upeu.nullpointerpos.data.remote.dto.RespuestaTicketWhatsAppDto? = null,
+    val pdfVistaPrevia: PdfComprobanteUi? = null,
 
     // Inventario y Almacén (Sprint 3)
     val insumos: List<Insumo> = emptyList(),
